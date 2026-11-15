@@ -1,0 +1,17 @@
+name: WordPress Plugin Check (portable beta)
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  plugin-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Review portable plugin using the official WordPress checker
+        uses: wordpress/plugin-check-action@v1
+        with:
+          build-dir: ./plugin/amino-llms
+          slug: amino-llms
