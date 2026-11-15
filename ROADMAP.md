@@ -1,43 +1,31 @@
-# Roadmap
+# Roadmap · Amino LLMS
 
-The **1.1.0 source is deliberately preserved** as a site-specific production baseline. Planned functionality is not claimed as shipped.
+## RC priority: distribute the essentials
 
-## Phase 1 · Portable core (1.2 beta implemented, real-site verification pending)
+- [x] Keep the former Amino Studio-specific 1.1 code in the repository for reference.
+- [x] Build a generic WordPress plugin with Auto, Manual and Hybrid modes.
+- [x] Choose public post types, highlighted content and item limits.
+- [x] Serve a virtual /llms.txt without touching server-root files.
+- [x] Hide private, draft, password-protected and common noindex content.
+- [x] Cache output briefly, clear on content edits, and support settings rollback.
+- [x] Build an installable ZIP through GitHub Actions.
+- [ ] Validate actual WordPress HTTP behavior and Plugin Check after the virtual-route pivot.
+- [ ] Test saving manual/hybrid content in a real WordPress admin and behavior with page caches.
+- [ ] Resolve any review findings, ship a versioned 1.2.0 stable archive.
 
-- [x] Create a separate portable 1.2 beta without ACTA, Ziryab, Amino Studio or domain-specific assumptions.
-- [x] Discover public WordPress post types and allow users to include/exclude types.
-- [ ] Improve import experience (safe refusal and explicit replacement implemented; guided import pending).
-- [x] Require explicit administrator publication, never write on activation.
-- [x] Prototype **Automatic**, **Manual** and **Hybrid** document modes (staging tests pending).
-- [ ] Keep featured-article selection independent of document-generation mode.
-- [ ] Add advanced section ordering and link selection (post type and count controls already in beta).
-- [ ] Fully exclude private/noindex content across supported SEO plugins (basic Yoast and Rank Math filtering implemented).
-- [ ] Handle WordPress in subdirectories and detect generators/route conflicts.
+## After first public distribution
 
-## Phase 2 · Exceptional WordPress administration
-
-- [ ] Visual summary dashboard, independent of the site's active theme.
-- [ ] Editor for site introduction, content categories and selected pages.
-- [ ] Searchable article/project selector instead of raw WordPress IDs.
-- [ ] Markdown preview, link validation and document size diagnostics.
-- [ ] Separate actions for **Generate preview** and **Publish**.
-- [ ] Revision snapshots, safe rollback and actionable error messages.
-- [ ] Keyboard accessible, i18n-ready, performant interface using WordPress APIs.
-- [ ] No external AI dependency, telemetry or CDN-based runtime assets.
-
-## Phase 3 · Harden and release
-
-- [ ] WordPress integration tests covering activation, updates, cron, REST, failures and multisite.
-- [ ] Test concurrent writes, atomic rollback, permissions and symlinks.
-- [ ] PHP compatibility matrix and WordPress Plugin Check / coding standards.
-- [ ] Review conflicts with Yoast, other llms generators, server caching and CDN behavior.
-- [ ] Installable GitHub release ZIP with changelog, provenance and checksum.
-- [ ] Accessible admin screenshots and WordPress.org assets.
-- [ ] WordPress.org submission **only after** generic functionality is verified.
+- [ ] Searchable visual content selector, replacing numeric post IDs.
+- [ ] Stronger SEO visibility adapters and exclusions.
+- [ ] Multilingual WordPress admin and full document localization.
+- [ ] Richer structural validation and optional resource descriptions.
+- [ ] Compatibility with WordPress subdirectories, multisite, and alternate web servers.
+- [ ] Installer/migration assistant for existing physical llms.txt files.
+- [ ] Screenshots and richer WordPress.org listing assets.
 
 ## Principles
 
-1. Existing site content must be preserved unless a user explicitly elects to replace it.
-2. A small editorially curated guide is more useful than indiscriminately copying a sitemap.
-3. We do not promise AI ranking, citation or ingestion.
-4. Every claimed feature must have a corresponding test or a documented limitation.
+1. **One file, one owner:** never silently overwrite, delete or shadow existing physical files.
+2. **Human first:** concise editorial choices are more helpful than indiscriminate sitemap copying.
+3. **No magic claims:** llms.txt does not guarantee search ranking or AI citation.
+4. **Test the promised feature:** mocks, real WordPress, Plugin Check and installable ZIP are separate gates.

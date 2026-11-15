@@ -1,4 +1,4 @@
-name: WordPress Plugin Check (portable beta)
+name: WordPress Plugin Check & runtime
 on:
   pull_request:
   workflow_dispatch:
@@ -10,8 +10,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Review portable plugin using the official WordPress checker
+      - name: Official Plugin Check
         uses: wordpress/plugin-check-action@v1
         with:
           build-dir: ./plugin/amino-llms
           slug: amino-llms
+      - name: Runtime route and rendering smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          wp-env run cli wp option update permalink_structure '/%postname%/'
+          wp-env run cli wp rewrite flush
+          wp-env run cli wp eval 'if (!class_exists("Amino_LLMS")) { WP_CLI::error("Plugin was not activated"); } if (!Amino_LLMS::valid_document(Amino_LLMS::render())) { WP_CLI::error("Invalid Markdown"); } WP_CLI::success("Amino LLMS renders on WordPress");'
+          curl --fail --silent --show-error --retry 4 --retry-delay 2 -D /tmp/amino-headers.txt http://localhost:8880/llms.txt -o /tmp/amino-llms.txt
+          grep -qi 'content-type: text/plain' /tmp/amino-headers.txt
+          grep -q '^# ' /tmp/amino-llms.txt
+          grep -q '^## Main Pages' /tmp/amino-llms.txt
+          test ! -f /tmp/amino-root-llms-test # the test does not create or write a server-root file
+          echo "Virtual /llms.txt responds with valid Markdown and text/plain."

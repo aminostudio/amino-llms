@@ -1,0 +1,41 @@
+name: Build installable WordPress ZIP
+on:
+  push:
+    branches: [main, 'feature/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check source layout and PHP syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l plugin/amino-llms/amino-llms.php
+          test -s plugin/amino-llms/readme.txt
+          test -s plugin/amino-llms/assets/admin.css
+          test -f LICENSE
+      - name: Build minimal installable plugin archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/amino-llms
+          cp plugin/amino-llms/amino-llms.php plugin/amino-llms/readme.txt dist/amino-llms/
+          cp -R plugin/amino-llms/assets dist/amino-llms/
+          cp LICENSE dist/amino-llms/LICENSE
+          (cd dist && zip -qr amino-llms-1.2.0-rc.1.zip amino-llms)
+          unzip -l dist/amino-llms-1.2.0-rc.1.zip
+          test "$(unzip -Z1 dist/amino-llms-1.2.0-rc.1.zip | grep -c 'amino-llms/amino-llms.php')" -eq 1
+          ! unzip -Z1 dist/amino-llms-1.2.0-rc.1.zip | grep -Eq '(^|/)(tests|\.github|vendor|node_modules)/'
+          sha256sum dist/amino-llms-1.2.0-rc.1.zip > dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: amino-llms-installable-rc1
+          path: |
+            dist/amino-llms-1.2.0-rc.1.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error

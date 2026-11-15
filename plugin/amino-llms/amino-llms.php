@@ -1,12 +1,15 @@
 <?php
 /**
  * Plugin Name: Amino LLMS
- * Description: Create an editorial llms.txt with automatic, manual or hybrid WordPress content discovery.
- * Version: 1.2.0-beta.1
+ * Plugin URI: https://github.com/aminostudio/amino-llms
+ * Description: An editorial llms.txt for WordPress, with automatic, manual and hybrid modes.
+ * Version: 1.2.0-rc.1
  * Requires at least: 6.4
  * Requires PHP: 8.0
  * Author: Amino Studio
+ * Author URI: https://aminostudio.fr/
  * License: GPL-2.0-or-later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: amino-llms
  */
 
@@ -15,41 +18,53 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Portable development engine.
- *
- * This separate plugin does not replace the site-specific v1.1.0 in production.
- * No file is created or adopted during installation.
+ * Virtual /llms.txt endpoint. No filesystem writes or external services.
+ * Legacy site-specific v1.1 lives in a different directory and is not modified.
  */
 final class Amino_LLMS {
-    private const OPT = 'amino_llms_v12_settings';
-    private const HASH = 'amino_llms_v12_file_hash';
-    private const BACKUP = 'amino_llms_v12_last_backup';
-    private const ERROR = 'amino_llms_v12_last_error';
-    private const CRON = 'amino_llms_v12_refresh';
+    private const VERSION = '1.2.0-rc.1';
+    private const OPTION = 'amino_llms_settings';
+    private const PREVIOUS = 'amino_llms_previous_settings';
+    private const CACHE = 'amino_llms_document_cache';
     private const MAX_BYTES = 131072;
 
     public static function boot(): void {
+        add_action('init', [__CLASS__, 'add_route']);
+        add_filter('query_vars', [__CLASS__, 'query_vars']);
+        add_action('template_redirect', [__CLASS__, 'serve']);
         add_action('admin_menu', [__CLASS__, 'admin_menu']);
         add_action('admin_enqueue_scripts', [__CLASS__, 'admin_assets']);
         add_action('admin_post_amino_llms_save', [__CLASS__, 'save_settings']);
-        add_action('admin_post_amino_llms_publish', [__CLASS__, 'publish']);
-        add_action('admin_post_amino_llms_restore', [__CLASS__, 'restore']);
-        add_action('save_post', [__CLASS__, 'on_content_change'], 30, 2);
-        add_action('transition_post_status', [__CLASS__, 'on_status_change'], 30, 3);
-        add_action('trashed_post', [__CLASS__, 'automatic_refresh']);
-        add_action('deleted_post', [__CLASS__, 'automatic_refresh']);
-        add_action(self::CRON, [__CLASS__, 'automatic_refresh']);
+        add_action('admin_post_amino_llms_restore', [__CLASS__, 'restore_settings']);
+        add_action('save_post', [__CLASS__, 'invalidate']);
+        add_action('deleted_post', [__CLASS__, 'invalidate']);
+        add_action('trashed_post', [__CLASS__, 'invalidate']);
+        add_action('untrashed_post', [__CLASS__, 'invalidate']);
+        add_action('set_object_terms', [__CLASS__, 'invalidate']);
+        add_action('updated_post_meta', [__CLASS__, 'invalidate']);
+        add_action('added_post_meta', [__CLASS__, 'invalidate']);
+        add_action('deleted_post_meta', [__CLASS__, 'invalidate']);
+        add_action('update_option_blogname', [__CLASS__, 'invalidate']);
+        add_action('update_option_blogdescription', [__CLASS__, 'invalidate']);
     }
 
     public static function activate(): void {
-        if (!wp_next_scheduled(self::CRON)) {
-            wp_schedule_event(time() + HOUR_IN_SECONDS, 'hourly', self::CRON);
-        }
-        // Never write to, delete, or take ownership of an existing llms.txt here.
+        self::add_route();
+        flush_rewrite_rules(false);
+        // Activation deliberately leaves every existing root llms.txt untouched.
     }
 
     public static function deactivate(): void {
-        wp_clear_scheduled_hook(self::CRON);
+        flush_rewrite_rules(false);
+    }
+
+    public static function add_route(): void {
+        add_rewrite_rule('^llms\.txt/?$', 'index.php?amino_llms_document=1', 'top');
+    }
+
+    public static function query_vars(array $vars): array {
+        $vars[] = 'amino_llms_document';
+        return $vars;
     }
 
     public static function defaults(): array {
@@ -60,51 +75,65 @@ final class Amino_LLMS {
             'introduction' => '',
             'manual_markdown' => '',
             'post_types' => ['page', 'post'],
-            'items_per_type' => 6,
+            'items_per_type' => 8,
             'highlight_ids' => '',
-            'auto_refresh' => true,
         ];
     }
 
     public static function settings(): array {
-        $saved = get_option(self::OPT, []);
+        $saved = get_option(self::OPTION, []);
         if (!is_array($saved)) {
             $saved = [];
         }
-        $settings = array_merge(self::defaults(), $saved);
-        $settings['post_types'] = is_array($settings['post_types']) ? $settings['post_types'] : [];
-        return $settings;
+        $s = array_merge(self::defaults(), $saved);
+        $s['post_types'] = is_array($s['post_types']) ? $s['post_types'] : [];
+        return $s;
     }
 
-    private static function public_types(): array {
+    public static function public_types(): array {
         $types = get_post_types(['public' => true], 'objects');
         unset($types['attachment']);
         return $types;
     }
 
     public static function clean_settings(array $input): array {
-        $defaults = self::defaults();
-        $modes = ['automatic', 'manual', 'hybrid'];
         $mode = sanitize_key((string) ($input['mode'] ?? 'hybrid'));
-        $types = array_keys(self::public_types());
-        $selected = array_values(array_intersect($types, array_map('sanitize_key', (array) ($input['post_types'] ?? []))));
+        if (!in_array($mode, ['automatic', 'manual', 'hybrid'], true)) {
+            $mode = 'hybrid';
+        }
+        $available = array_keys(self::public_types());
+        $raw_types = isset($input['post_types']) && is_array($input['post_types']) ? $input['post_types'] : [];
+        $selected = array_values(array_unique(array_intersect($available, array_map('sanitize_key', $raw_types))));
         $ids = [];
-        foreach (preg_split('/[\s,]+/', (string) ($input['highlight_ids'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) ?: [] as $value) {
-            if (preg_match('/^[0-9]+$/D', $value) && (int) $value > 0 && !in_array((int) $value, $ids, true)) {
-                $ids[] = (int) $value;
+        $raw_ids = $input['highlight_ids'] ?? '';
+        $parts = is_array($raw_ids) ? $raw_ids : preg_split('/[\s,]+/', (string) $raw_ids, -1, PREG_SPLIT_NO_EMPTY);
+        foreach ($parts ?: [] as $part) {
+            $id = (string) $part;
+            if (preg_match('/^[1-9][0-9]*$/D', $id) && !in_array((int) $id, $ids, true)) {
+                $ids[] = (int) $id;
             }
         }
         return [
-            'mode' => in_array($mode, $modes, true) ? $mode : 'hybrid',
-            'site_name' => substr(sanitize_text_field((string) ($input['site_name'] ?? $defaults['site_name'])), 0, 160),
-            'summary' => substr(sanitize_text_field((string) ($input['summary'] ?? '')), 0, 500),
-            'introduction' => substr(sanitize_textarea_field((string) ($input['introduction'] ?? '')), 0, 12000),
-            'manual_markdown' => substr(sanitize_textarea_field((string) ($input['manual_markdown'] ?? '')), 0, self::MAX_BYTES),
+            'mode' => $mode,
+            'site_name' => self::limit(sanitize_text_field((string) ($input['site_name'] ?? '')), 160),
+            'summary' => self::limit(sanitize_text_field((string) ($input['summary'] ?? '')), 500),
+            'introduction' => self::limit(sanitize_textarea_field((string) ($input['introduction'] ?? '')), 12000),
+            'manual_markdown' => self::limit(sanitize_textarea_field((string) ($input['manual_markdown'] ?? '')), self::MAX_BYTES),
             'post_types' => $selected,
-            'items_per_type' => max(1, min(25, absint($input['items_per_type'] ?? 6))),
+            'items_per_type' => max(1, min(25, absint($input['items_per_type'] ?? 8))),
             'highlight_ids' => implode(',', array_slice($ids, 0, 10)),
-            'auto_refresh' => !empty($input['auto_refresh']),
         ];
+    }
+
+    private static function limit(string $value, int $bytes): string {
+        if (strlen($value) <= $bytes) {
+            return $value;
+        }
+        $short = substr($value, 0, $bytes);
+        while ($short !== '' && preg_match('//u', $short) !== 1) {
+            $short = substr($short, 0, -1);
+        }
+        return $short;
     }
 
     private static function md_label(string $value): string {
@@ -118,72 +147,73 @@ final class Amino_LLMS {
             return false;
         }
         $type = get_post_type_object($post->post_type);
-        if (!$type || !$type->public) {
+        if (!$type || !$type->public || $post->post_type === 'attachment') {
             return false;
         }
-        // WordPress, Yoast and Rank Math signals; extensible for other SEO plugins.
         if ((string) get_post_meta($post->ID, '_yoast_wpseo_meta-robots-noindex', true) === '1') {
             return false;
         }
-        $rank = get_post_meta($post->ID, 'rank_math_robots', true);
-        if ($rank === 'noindex' || (is_array($rank) && in_array('noindex', $rank, true))) {
+        $rank_math = get_post_meta($post->ID, 'rank_math_robots', true);
+        if ($rank_math === 'noindex' || (is_array($rank_math) && in_array('noindex', $rank_math, true))) {
             return false;
         }
         return (bool) apply_filters('amino_llms_include_post', true, $post);
     }
 
-    private static function item(WP_Post $post): string {
+    private static function link(WP_Post $post): string {
         $url = get_permalink($post);
         if (!is_string($url) || !in_array(strtolower((string) wp_parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)) {
             return '';
         }
-        // Local URLs are not fetched: compare their hosts without an SSRF-style check.
-        // wp_http_validate_url() would incorrectly reject legitimate localhost installations.
         if (strtolower((string) wp_parse_url($url, PHP_URL_HOST)) !== strtolower((string) wp_parse_url(home_url('/'), PHP_URL_HOST))) {
             return '';
         }
-        $label = self::md_label((string) get_the_title($post));
-        return $label === '' ? '' : '- [' . $label . '](' . esc_url_raw($url) . ')';
+        $title = self::md_label((string) get_the_title($post));
+        return $title === '' ? '' : '- [' . $title . '](' . esc_url_raw($url) . ')';
     }
 
-    public static function render_document(?array $settings = null): string {
+    public static function render(?array $settings = null): string {
         $s = $settings ?? self::settings();
-        if (($s['mode'] ?? '') === 'manual') {
-            return trim((string) ($s['manual_markdown'] ?? '')) . "\n";
+        if ($s['mode'] === 'manual') {
+            return trim((string) $s['manual_markdown']) . "\n";
         }
-        $name = self::md_label((string) ($s['site_name'] ?? ''));
-        $summary = self::md_label((string) ($s['summary'] ?? ''));
-        $lines = ['# ' . $name, ''];
+        $title = self::md_label((string) $s['site_name']);
+        if ($title === '') {
+            $title = self::md_label((string) get_bloginfo('name'));
+        }
+        $summary = self::md_label((string) $s['summary']);
+        $lines = ['# ' . $title, ''];
         if ($summary !== '') {
             $lines[] = '> ' . $summary;
             $lines[] = '';
         }
-        if (($s['mode'] ?? '') === 'hybrid' && trim((string) ($s['introduction'] ?? '')) !== '') {
+        if ($s['mode'] === 'hybrid' && trim((string) $s['introduction']) !== '') {
             $lines[] = trim((string) $s['introduction']);
             $lines[] = '';
         }
-
         $lines[] = '## Main Pages';
         $lines[] = '';
         $lines[] = '- [Home](' . esc_url_raw(home_url('/')) . ')';
         $lines[] = '';
+
         $seen = [];
-        // Avoid a second link to the front page when WordPress uses a static page.
-        $front_id = absint(get_option('page_on_front', 0));
-        if ($front_id) {
-            $seen[$front_id] = true;
+        $home_id = absint(get_option('page_on_front', 0));
+        if ($home_id) {
+            $seen[$home_id] = true;
         }
-        $ids = preg_split('/,/', (string) ($s['highlight_ids'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $featured = [];
-        foreach (array_slice($ids, 0, 10) as $id) {
-            $p = get_post((int) $id);
-            if (!($p instanceof WP_Post) || !self::allowed_post($p)) {
+        foreach (explode(',', (string) $s['highlight_ids']) as $id) {
+            if (!ctype_digit($id) || !(int) $id) {
                 continue;
             }
-            $line = self::item($p);
-            if ($line !== '' && !isset($seen[$p->ID])) {
-                $featured[] = $line;
-                $seen[$p->ID] = true;
+            $post = get_post((int) $id);
+            if (!($post instanceof WP_Post) || !self::allowed_post($post) || isset($seen[$post->ID])) {
+                continue;
+            }
+            $row = self::link($post);
+            if ($row !== '') {
+                $featured[] = $row;
+                $seen[$post->ID] = true;
             }
         }
         if ($featured) {
@@ -192,39 +222,39 @@ final class Amino_LLMS {
             array_push($lines, ...$featured);
             $lines[] = '';
         }
-        $available = self::public_types();
-        foreach ((array) ($s['post_types'] ?? []) as $type) {
-            if (!isset($available[$type])) {
+
+        $types = self::public_types();
+        foreach ($s['post_types'] as $post_type) {
+            if (!isset($types[$post_type])) {
                 continue;
             }
-            $heading = $type === 'post' ? 'Latest Articles' : ($type === 'page' ? 'Pages' : $available[$type]->labels->name);
-            $results = get_posts([
-                'post_type' => $type,
+            $posts = get_posts([
+                'post_type' => $post_type,
                 'post_status' => 'publish',
                 'posts_per_page' => 100,
-                'orderby' => $type === 'page' ? 'menu_order title' : 'date',
+                'orderby' => $post_type === 'page' ? ['menu_order' => 'ASC', 'title' => 'ASC'] : 'date',
                 'order' => 'DESC',
-                'has_password' => false,
                 'ignore_sticky_posts' => true,
                 'suppress_filters' => false,
             ]);
             $items = [];
-            foreach ($results as $p) {
-                if (!($p instanceof WP_Post) || isset($seen[$p->ID]) || !self::allowed_post($p)) {
+            foreach ($posts as $post) {
+                if (!($post instanceof WP_Post) || isset($seen[$post->ID]) || !self::allowed_post($post)) {
                     continue;
                 }
-                $line = self::item($p);
-                if ($line === '') {
+                $row = self::link($post);
+                if ($row === '') {
                     continue;
                 }
-                $items[] = $line;
-                $seen[$p->ID] = true;
-                if (count($items) >= (int) ($s['items_per_type'] ?? 6)) {
+                $items[] = $row;
+                $seen[$post->ID] = true;
+                if (count($items) >= (int) $s['items_per_type']) {
                     break;
                 }
             }
             if ($items) {
-                $lines[] = '## ' . self::md_label($heading);
+                $heading = $post_type === 'post' ? 'Latest Articles' : ($post_type === 'page' ? 'Pages' : $types[$post_type]->labels->name);
+                $lines[] = '## ' . self::md_label((string) $heading);
                 $lines[] = '';
                 array_push($lines, ...$items);
                 $lines[] = '';
@@ -233,146 +263,43 @@ final class Amino_LLMS {
         return (string) apply_filters('amino_llms_rendered_document', trim(implode("\n", $lines)) . "\n", $s);
     }
 
-    private static function path(): string|WP_Error {
-        // Distinct public and WordPress install paths cannot reliably be mapped to one file.
-        if (rtrim((string) wp_parse_url(home_url('/'), PHP_URL_PATH), '/') !== rtrim((string) wp_parse_url(site_url('/'), PHP_URL_PATH), '/')) {
-            return new WP_Error('different_roots', 'WordPress and public site paths differ; file location must be configured before writing.');
-        }
-        return trailingslashit(ABSPATH) . 'llms.txt';
+    public static function valid_document(string $document): bool {
+        return $document !== '' && strlen($document) <= self::MAX_BYTES &&
+            preg_match('/\A#[ \t]+\S/mu', $document) === 1;
     }
 
-    private static function filesystem(): mixed {
-        if (!function_exists('WP_Filesystem')) {
-            require_once ABSPATH . 'wp-admin/includes/file.php';
-        }
-        global $wp_filesystem;
-        if (!WP_Filesystem() || !is_object($wp_filesystem) || $wp_filesystem->method !== 'direct') {
-            return new WP_Error('unsupported_filesystem', 'Direct WordPress filesystem access is required for a safe local-file replacement.');
-        }
-        return $wp_filesystem;
+    public static function invalidate(): void {
+        delete_transient(self::CACHE);
     }
 
-    private static function error(string $message): bool {
-        update_option(self::ERROR, $message, false);
-        return false;
+    public static function current_document(): string {
+        $cached = get_transient(self::CACHE);
+        if (is_string($cached) && $cached !== '') {
+            return $cached;
+        }
+        $document = self::render();
+        if (self::valid_document($document)) {
+            set_transient(self::CACHE, $document, 5 * MINUTE_IN_SECONDS);
+        }
+        return $document;
     }
 
-    private static function legacy_conflict(): bool {
-        $legacy = 'amino-llms-dynamic/amino-llms-dynamic.php';
-        $network = function_exists('get_site_option') ? (array) get_site_option('active_sitewide_plugins', []) : [];
-        return in_array($legacy, (array) get_option('active_plugins', []), true) || array_key_exists($legacy, $network);
-    }
-
-    private static function validate_document(string $content): bool {
-        if ($content === '' || strlen($content) > self::MAX_BYTES) {
-            return self::error('The document is empty or exceeds 128 KiB.');
-        }
-        if (!preg_match('/^#[ \t]+\S/mu', $content)) {
-            return self::error('An llms.txt document needs a top-level # heading.');
-        }
-        return true;
-    }
-
-    /**
-     * Fail closed on unknown files or external modifications.
-     * $adopt=true requires a checked admin form submission, never a cron job.
-     */
-    public static function write_document(string $content, bool $adopt = false): bool {
-        if (self::legacy_conflict()) {
-            return self::error('The legacy Amino Studio llms.txt plugin is active. Deactivate it before using this engine.');
-        }
-        if (!self::validate_document($content)) {
-            return false;
-        }
-        $path = self::path();
-        if (is_wp_error($path)) {
-            return self::error($path->get_error_message());
-        }
-        $fs = self::filesystem();
-        if (is_wp_error($fs)) {
-            return self::error($fs->get_error_message());
-        }
-        if (is_link($path)) {
-            return self::error('Refusing to overwrite an llms.txt symbolic link.');
-        }
-        $exists = $fs->exists($path);
-        if ($exists && (!$fs->is_file($path) || !$fs->is_readable($path))) {
-            return self::error('The existing llms.txt is not a readable regular file.');
-        }
-        $previous = $exists ? $fs->get_contents($path) : null;
-        if ($exists && !is_string($previous)) {
-            return self::error('The existing llms.txt could not be read.');
-        }
-        $known = (string) get_option(self::HASH, '');
-        if ($exists && !$adopt && ($known === '' || !hash_equals($known, hash('sha256', $previous)))) {
-            return self::error('An existing or externally modified llms.txt needs explicit adoption before replacement.');
-        }
-        if (!$exists && $known !== '' && !$adopt) {
-            return self::error('The previously managed file was removed. Publish explicitly before recreating it.');
-        }
-        if (!$fs->is_writable(dirname($path)) || ($exists && !$fs->is_writable($path))) {
-            return self::error('The llms.txt directory or file is not writable by PHP.');
-        }
-        if ($exists && $previous === $content) {
-            update_option(self::HASH, hash('sha256', $content), false);
-            delete_option(self::ERROR);
-            return true;
-        }
-        if (is_string($previous) && strlen($previous) > self::MAX_BYTES) {
-            return self::error('The previous llms.txt is too large for the built-in backup; refusing to replace it.');
-        }
-        $temp = dirname($path) . '/.amino-llms-' . wp_generate_uuid4() . '.tmp';
-        $mode = $exists ? octdec((string) $fs->getchmod($path)) : 0644;
-        if (!$mode) {
-            $mode = 0644;
-        }
-        if (!$fs->put_contents($temp, $content, $mode)) {
-            $fs->delete($temp);
-            return self::error('Could not safely stage the new llms.txt in its destination directory.');
-        }
-        // WordPress' filesystem move(overwrite=true) DELETES the target before
-        // renaming. For direct/local filesystem installations, POSIX rename()
-        // performs an atomic replacement instead, keeping the old target intact
-        // on failure. The temporary file is always created in the same directory.
-        // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename -- Required to avoid deleting the published file before replacement is committed.
-        if (!@rename($temp, $path)) {
-            $fs->delete($temp);
-            return self::error('Atomic replacement failed; the existing llms.txt was left intact.');
-        }
-        clearstatcache(true, $path);
-        if ($fs->get_contents($path) !== $content) {
-            return self::error('The written llms.txt failed readback verification.');
-        }
-        if ($exists) {
-            update_option(self::BACKUP, ['content' => $previous, 'date' => current_time('mysql')], false);
-        }
-        update_option(self::HASH, hash('sha256', $content), false);
-        delete_option(self::ERROR);
-        return true;
-    }
-
-    public static function automatic_refresh(): void {
-        $s = self::settings();
-        if (empty($s['auto_refresh']) || get_option(self::HASH, '') === '') {
-            return; // Nothing is owned by this plugin until explicit publication.
-        }
-        self::write_document(self::render_document($s), false);
-    }
-
-    public static function on_content_change(int $post_id, WP_Post $post): void {
-        if (wp_is_post_revision($post_id) || wp_is_post_autosave($post_id)) {
+    public static function serve(): void {
+        if ((string) get_query_var('amino_llms_document') !== '1') {
             return;
         }
-        if (!in_array($post->post_type, self::settings()['post_types'], true)) {
-            return;
+        $document = self::current_document();
+        if (!self::valid_document($document)) {
+            status_header(503);
+            header('Content-Type: text/plain; charset=UTF-8');
+            echo 'llms.txt is not configured yet.';
+            exit;
         }
-        self::automatic_refresh();
-    }
-
-    public static function on_status_change(string $new, string $old, WP_Post $post): void {
-        if ($new !== $old && in_array($post->post_type, self::settings()['post_types'], true)) {
-            self::automatic_refresh();
-        }
+        status_header(200);
+        header('Content-Type: text/plain; charset=UTF-8');
+        header('X-Content-Type-Options: nosniff');
+        echo $document; // Plain text Markdown, not HTML.
+        exit;
     }
 
     public static function admin_menu(): void {
@@ -381,52 +308,47 @@ final class Amino_LLMS {
 
     public static function admin_assets(string $hook): void {
         if ($hook === 'settings_page_amino-llms') {
-            wp_enqueue_style('amino-llms-admin', plugin_dir_url(__FILE__) . 'assets/admin.css', [], '1.2.0');
+            wp_enqueue_style('amino-llms-admin', plugin_dir_url(__FILE__) . 'assets/admin.css', [], self::VERSION);
         }
     }
 
-    private static function authorize(): void {
+    private static function authorize(string $nonce): void {
         if (!current_user_can('manage_options')) {
-            wp_die(esc_html__('You do not have permission to manage this document.', 'amino-llms'));
+            wp_die(esc_html__('You cannot manage these settings.', 'amino-llms'));
         }
+        check_admin_referer($nonce);
     }
 
-    private static function redirect(string $state): void {
-        wp_safe_redirect(add_query_arg('amino_llms_notice', $state, admin_url('options-general.php?page=amino-llms')));
+    private static function redirect(string $notice): void {
+        wp_safe_redirect(add_query_arg('amino_llms_notice', $notice, admin_url('options-general.php?page=amino-llms')));
         exit;
     }
 
     public static function save_settings(): void {
-        self::authorize();
-        check_admin_referer('amino_llms_save');
-        // The received array is sanitized field-by-field by clean_settings().
-        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Centralized type-specific sanitization in clean_settings().
-        $values = isset($_POST['amino_llms']) && is_array($_POST['amino_llms']) ? wp_unslash($_POST['amino_llms']) : [];
-        update_option(self::OPT, self::clean_settings($values), false);
+        self::authorize('amino_llms_save');
+        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Each field is sanitized in clean_settings().
+        $input = isset($_POST['amino_llms']) && is_array($_POST['amino_llms']) ? wp_unslash($_POST['amino_llms']) : [];
+        $clean = self::clean_settings($input);
+        if (!self::valid_document(self::render($clean))) {
+            self::redirect('invalid');
+        }
+        update_option(self::PREVIOUS, self::settings(), false);
+        update_option(self::OPTION, $clean, false);
+        self::invalidate();
         self::redirect('saved');
     }
 
-    public static function publish(): void {
-        self::authorize();
-        check_admin_referer('amino_llms_publish');
-        $adopt = isset($_POST['amino_llms_confirm_replace']) && $_POST['amino_llms_confirm_replace'] === '1';
-        self::redirect(self::write_document(self::render_document(), $adopt) ? 'published' : 'error');
-    }
-
-    public static function restore(): void {
-        self::authorize();
-        check_admin_referer('amino_llms_restore');
-        $backup = get_option(self::BACKUP, null);
-        if (!is_array($backup) || !is_string($backup['content'] ?? null)) {
-            self::redirect('error');
+    public static function restore_settings(): void {
+        self::authorize('amino_llms_restore');
+        $previous = get_option(self::PREVIOUS, null);
+        if (!is_array($previous)) {
+            self::redirect('nothing');
         }
-        // Restoring is an intentional publication of a saved previous version.
-        $ok = self::write_document($backup['content'], true);
-        if ($ok) {
-            // A restored pre-plugin file is no longer managed by automatic updates.
-            delete_option(self::HASH);
-        }
-        self::redirect($ok ? 'restored' : 'error');
+        $current = self::settings();
+        update_option(self::OPTION, $previous, false);
+        update_option(self::PREVIOUS, $current, false);
+        self::invalidate();
+        self::redirect('restored');
     }
 
     public static function admin_page(): void {
@@ -434,70 +356,48 @@ final class Amino_LLMS {
             return;
         }
         $s = self::settings();
-        $preview = self::render_document($s);
-        $path = self::path();
-        $exists = !is_wp_error($path) && is_file($path);
-        $tracked = get_option(self::HASH, '') !== '';
-        $conflict = self::legacy_conflict();
-        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only admin notice, no state change.
+        $preview = self::render($s);
+        $root_file = trailingslashit(ABSPATH) . 'llms.txt';
+        $static_file = is_file($root_file);
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only status notice.
         $notice = isset($_GET['amino_llms_notice']) ? sanitize_key(wp_unslash($_GET['amino_llms_notice'])) : '';
-        echo '<div class="wrap amino-llms-admin"><div class="amino-llms-hero"><span class="amino-llms-kicker">AMINO / LLMS</span><h1>A clear guide to your website.</h1><p>Build a concise, curated Markdown introduction for AI agents. Your website, your words, your control.</p></div>';
+        echo '<div class="wrap amino-llms-admin"><div class="amino-llms-hero"><span class="amino-llms-kicker">AMINO / LLMS</span><h1>' . esc_html__('Your website, clearly understood.', 'amino-llms') . '</h1><p>' . esc_html__('Write an introduction that matters. Keep public content links up to date. No AI API, tracking or root file permissions.', 'amino-llms') . '</p></div>';
         if ($notice) {
-            echo '<div class="notice notice-' . esc_attr($notice === 'error' ? 'error' : 'success') . '"><p>' . esc_html(ucfirst($notice)) . '</p></div>';
+            $okay = in_array($notice, ['saved', 'restored'], true);
+            echo '<div class="notice notice-' . esc_attr($okay ? 'success' : 'error') . '"><p>' . esc_html($notice === 'invalid' ? 'A valid document needs a # heading and must be smaller than 128 KiB.' : ucfirst($notice)) . '</p></div>';
         }
-        $err = get_option(self::ERROR, '');
-        if ($err) {
-            echo '<div class="notice notice-error"><p>' . esc_html((string) $err) . '</p></div>';
+        if ($static_file) {
+            echo '<div class="notice notice-warning"><p>' . esc_html__('An existing physical llms.txt was detected. Your web server may serve that file instead of the virtual document. Import its contents manually before renaming or removing it. This plugin never deletes or overwrites that file.', 'amino-llms') . '</p></div>';
         }
-        if ($conflict) {
-            echo '<div class="notice notice-warning"><p>The legacy Amino llms.txt plugin is active. This development engine will not write the file until the conflict is resolved.</p></div>';
-        }
-        if (is_wp_error($path)) {
-            echo '<div class="notice notice-warning"><p>' . esc_html($path->get_error_message()) . '</p></div>';
-        }
-        echo '<div class="amino-llms-meta"><span>File: <strong>' . esc_html($exists ? 'Exists' : 'Not created') . '</strong></span><span>Ownership: <strong>' . esc_html($tracked ? 'Managed' : 'Not yet adopted') . '</strong></span><span>Version: <strong>1.2.0 beta</strong></span></div>';
-        echo '<div class="amino-llms-grid"><div class="amino-llms-panel"><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
-        echo '<input type="hidden" name="action" value="amino_llms_save">';
+        echo '<div class="amino-llms-meta"><span>' . esc_html__('Delivery:', 'amino-llms') . ' <strong>' . esc_html__('Virtual /llms.txt', 'amino-llms') . '</strong></span><span>' . esc_html__('Mode:', 'amino-llms') . ' <strong>' . esc_html(ucfirst((string) $s['mode'])) . '</strong></span><span>v' . esc_html(self::VERSION) . '</span></div>';
+        echo '<div class="amino-llms-grid"><div class="amino-llms-panel"><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="amino_llms_save">';
         wp_nonce_field('amino_llms_save');
-        echo '<h2>Content &amp; editorial settings</h2>';
-        echo '<p><label for="al-mode"><strong>Document mode</strong></label><select id="al-mode" name="amino_llms[mode]" class="widefat">';
-        foreach (['hybrid'=>'Hybrid · written identity + live links', 'automatic'=>'Automatic · published content', 'manual'=>'Manual · full Markdown control'] as $value=>$label) {
-            echo '<option value="' . esc_attr($value) . '" ' . selected($s['mode'], $value, false) . '>' . esc_html($label) . '</option>';
+        echo '<h2>' . esc_html__('Editorial settings', 'amino-llms') . '</h2><p><label for="al-mode"><strong>' . esc_html__('Document mode', 'amino-llms') . '</strong></label><select class="widefat" id="al-mode" name="amino_llms[mode]">';
+        foreach (['hybrid' => 'Hybrid: authored identity + current links', 'automatic' => 'Automatic: public WordPress content', 'manual' => 'Manual: your own Markdown'] as $key => $label) {
+            echo '<option value="' . esc_attr($key) . '" ' . selected($s['mode'], $key, false) . '>' . esc_html($label) . '</option>';
         }
-        echo '</select></p><p><label for="al-name"><strong>Website name</strong></label><input class="widefat" id="al-name" maxlength="160" name="amino_llms[site_name]" value="' . esc_attr($s['site_name']) . '"></p>';
-        echo '<p><label for="al-summary"><strong>Short summary</strong></label><textarea class="widefat" id="al-summary" rows="3" name="amino_llms[summary]">' . esc_textarea($s['summary']) . '</textarea></p>';
-        echo '<p><label for="al-intro"><strong>Editorial introduction (Hybrid)</strong></label><textarea class="widefat" id="al-intro" rows="5" name="amino_llms[introduction]">' . esc_textarea($s['introduction']) . '</textarea></p>';
-        echo '<p><label for="al-manual"><strong>Full Markdown document (Manual)</strong></label><textarea class="widefat amino-llms-mono" id="al-manual" rows="7" name="amino_llms[manual_markdown]">' . esc_textarea($s['manual_markdown']) . '</textarea></p>';
-        echo '<fieldset><legend><strong>Included public post types</strong></legend>';
+        echo '</select></p><p><label for="al-name"><strong>' . esc_html__('Site name', 'amino-llms') . '</strong></label><input id="al-name" class="widefat" name="amino_llms[site_name]" maxlength="160" value="' . esc_attr((string) $s['site_name']) . '"></p>';
+        echo '<p><label for="al-summary"><strong>' . esc_html__('Short description', 'amino-llms') . '</strong></label><textarea class="widefat" rows="3" id="al-summary" name="amino_llms[summary]">' . esc_textarea((string) $s['summary']) . '</textarea></p>';
+        echo '<p><label for="al-intro"><strong>' . esc_html__('Editorial introduction (Hybrid)', 'amino-llms') . '</strong></label><textarea class="widefat" rows="5" id="al-intro" name="amino_llms[introduction]">' . esc_textarea((string) $s['introduction']) . '</textarea></p>';
+        echo '<p><label for="al-manual"><strong>' . esc_html__('Complete Markdown (Manual)', 'amino-llms') . '</strong></label><textarea class="widefat amino-llms-mono" rows="6" id="al-manual" name="amino_llms[manual_markdown]">' . esc_textarea((string) $s['manual_markdown']) . '</textarea></p>';
+        echo '<fieldset><legend><strong>' . esc_html__('Include public content types', 'amino-llms') . '</strong></legend>';
         foreach (self::public_types() as $type) {
             echo '<label class="amino-llms-choice"><input type="checkbox" name="amino_llms[post_types][]" value="' . esc_attr($type->name) . '" ' . checked(in_array($type->name, $s['post_types'], true), true, false) . '> ' . esc_html($type->labels->name) . '</label>';
         }
-        echo '</fieldset><p><label for="al-count"><strong>Maximum links per type</strong></label><input class="small-text" id="al-count" type="number" min="1" max="25" name="amino_llms[items_per_type]" value="' . esc_attr((string) $s['items_per_type']) . '"></p>';
-        echo '<p><label for="al-featured"><strong>Highlighted post IDs</strong> (comma-separated, in editorial order)</label><input class="widefat" id="al-featured" name="amino_llms[highlight_ids]" value="' . esc_attr($s['highlight_ids']) . '"></p>';
-        echo '<p><label><input type="checkbox" name="amino_llms[auto_refresh]" value="1" ' . checked(!empty($s['auto_refresh']), true, false) . '> Update an already managed file after content changes and hourly checks</label></p>';
-        submit_button('Save settings');
-        echo '</form></div><div class="amino-llms-panel"><h2>Live preview</h2><p>This preview reflects your last saved settings. Publishing is a separate action.</p>';
-        echo '<textarea class="widefat amino-llms-mono" rows="20" readonly aria-label="Generated Markdown preview">' . esc_textarea($preview) . '</textarea>';
-        echo '<p class="description">' . esc_html(number_format_i18n(strlen($preview))) . ' bytes · <a href="' . esc_url(home_url('/llms.txt')) . '" target="_blank" rel="noopener noreferrer">View public llms.txt</a></p>';
-        echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="amino_llms_publish">';
-        wp_nonce_field('amino_llms_publish');
-        if ($exists && !$tracked) {
-            echo '<p><label><input type="checkbox" name="amino_llms_confirm_replace" value="1" required> I understand an existing llms.txt will be replaced, with its previous contents retained as a restore point.</label></p>';
-        } elseif ($tracked) {
-            echo '<p class="description">If the file was changed outside this plugin, publication requires a deliberate re-adoption.</p>';
-            echo '<p><label><input type="checkbox" name="amino_llms_confirm_replace" value="1"> Re-adopt externally modified llms.txt (only if intentional)</label></p>';
-        }
-        submit_button('Publish llms.txt', 'primary', 'submit', false);
+        echo '</fieldset><p><label for="al-count"><strong>' . esc_html__('Links per content type', 'amino-llms') . '</strong></label><input type="number" class="small-text" min="1" max="25" id="al-count" name="amino_llms[items_per_type]" value="' . esc_attr((string) $s['items_per_type']) . '"></p>';
+        echo '<p><label for="al-high"><strong>' . esc_html__('Featured post IDs', 'amino-llms') . '</strong> ' . esc_html__('(comma-separated; optional)', 'amino-llms') . '</label><input class="widefat" id="al-high" name="amino_llms[highlight_ids]" value="' . esc_attr((string) $s['highlight_ids']) . '"></p>';
+        submit_button(__('Save and update llms.txt', 'amino-llms'));
         echo '</form>';
-        $backup = get_option(self::BACKUP, null);
-        if (is_array($backup) && is_string($backup['content'] ?? null)) {
-            echo '<hr><h3>Previous document</h3><p>Saved before the last replacement: ' . esc_html((string) ($backup['date'] ?? '')) . '</p>';
+        if (is_array(get_option(self::PREVIOUS, null))) {
             echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="amino_llms_restore">';
             wp_nonce_field('amino_llms_restore');
-            submit_button('Restore previous document', 'secondary', 'submit', false);
+            submit_button(__('Restore previous settings', 'amino-llms'), 'secondary', 'submit', false);
             echo '</form>';
         }
-        echo '</div></div></div>';
+        echo '</div><div class="amino-llms-panel"><h2>' . esc_html__('Markdown preview', 'amino-llms') . '</h2><p>' . esc_html__('Preview of your last saved settings. Save changes to update the public endpoint.', 'amino-llms') . '</p>';
+        echo '<textarea class="widefat amino-llms-mono" rows="24" readonly aria-label="' . esc_attr__('Markdown preview', 'amino-llms') . '">' . esc_textarea($preview) . '</textarea>';
+        echo '<p class="description">' . esc_html(number_format_i18n(strlen($preview))) . ' bytes · <a href="' . esc_url(home_url('/llms.txt')) . '" target="_blank" rel="noopener noreferrer">' . esc_html__('View public llms.txt', 'amino-llms') . '</a></p>';
+        echo '<p class="description">' . esc_html__('llms.txt is a discovery format, not a guarantee of AI indexing or citations.', 'amino-llms') . '</p></div></div></div>';
     }
 }
 
