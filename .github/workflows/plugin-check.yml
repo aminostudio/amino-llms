@@ -45,3 +45,14 @@ jobs:
           grep -q 'editorial introduction' /tmp/amino-hybrid.txt
           wp-env run cli wp eval 'if (file_exists(ABSPATH . "llms.txt")) { WP_CLI::error("Unexpected physical llms.txt was created"); } WP_CLI::success("No root-file writes");'
           echo "All virtual delivery modes passed HTTP smoke tests."
+          # Exercise the actual admin-post save and rollback handlers using a real admin user and nonce.
+          wp-env run cli wp eval 'wp_set_current_user(1); $_REQUEST["_wpnonce"] = wp_create_nonce("amino_llms_save"); $_POST["amino_llms"] = ["mode" => "manual", "site_name" => "Admin QA", "summary" => "", "introduction" => "", "manual_markdown" => "# Admin Save\n\n## Links\n- [Encoded](https://example.org/my%20file.pdf)", "post_types" => ["post"], "items_per_type" => 3, "highlight_ids" => ""]; Amino_LLMS::save_settings();'
+          wp-env run cli wp eval '$s = Amino_LLMS::settings(); if ($s["mode"] !== "manual" || !str_contains($s["manual_markdown"], "my%20file.pdf")) { WP_CLI::error("Admin form save failed to preserve Markdown URL"); } WP_CLI::success("Admin save confirmed");'
+          curl -fsS http://localhost:8880/llms.txt -o /tmp/amino-admin-save.txt
+          grep -q '^# Admin Save' /tmp/amino-admin-save.txt
+          grep -q 'my%20file.pdf' /tmp/amino-admin-save.txt
+          wp-env run cli wp eval 'wp_set_current_user(1); $_REQUEST["_wpnonce"] = wp_create_nonce("amino_llms_restore"); Amino_LLMS::restore_settings();'
+          wp-env run cli wp eval '$s = Amino_LLMS::settings(); if ($s["mode"] !== "hybrid") { WP_CLI::error("Admin rollback did not restore hybrid settings"); } WP_CLI::success("Admin restore confirmed");'
+          curl -fsS http://localhost:8880/llms.txt -o /tmp/amino-admin-restore.txt
+          grep -q 'editorial introduction' /tmp/amino-admin-restore.txt
+          echo "Real admin save/restore handlers passed."

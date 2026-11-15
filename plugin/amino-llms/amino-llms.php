@@ -3,7 +3,7 @@
  * Plugin Name: Amino LLMS
  * Plugin URI: https://github.com/aminostudio/amino-llms
  * Description: An editorial llms.txt for WordPress, with automatic, manual and hybrid modes.
- * Version: 1.2.0-rc.1
+ * Version: 1.2.0
  * Requires at least: 6.4
  * Requires PHP: 8.0
  * Author: Amino Studio
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
  * Legacy site-specific v1.1 lives in a different directory and is not modified.
  */
 final class Amino_LLMS {
-    private const VERSION = '1.2.0-rc.1';
+    private const VERSION = '1.2.0';
     private const OPTION = 'amino_llms_settings';
     private const PREVIOUS = 'amino_llms_previous_settings';
     private const CACHE = 'amino_llms_document_cache';

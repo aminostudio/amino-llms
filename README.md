@@ -8,7 +8,7 @@ Amino LLMS is an independent, lightweight WordPress plugin for publishing a huma
 
 **No external AI service. No telemetry. No server-root file writes.**
 
-## What ships in 1.2.0-rc.1
+## What ships in 1.2.0
 
 - Automatic mode: site identity and links to recently published public content.
 - Manual mode: complete Markdown authoring in the WordPress admin.
@@ -38,7 +38,7 @@ The site-specific legacy implementation lives at `plugin/amino-llms-dynamic/`. I
 
 ### Honest limitations
 
-This is a release candidate undergoing real-world testing, not yet an approved WordPress.org listing. The editor currently uses a comma-separated field for highlighted IDs. More sophisticated content search and multilingual settings are future improvements, not release blockers.
+This is the first minimal stable GitHub build, not yet an approved WordPress.org listing. Test it on staging before submitting or deploying to production. The editor currently uses a comma-separated field for highlighted IDs. More sophisticated content search and multilingual settings are future improvements, not release blockers.
 
 An `llms.txt` is a [community-proposed discovery format](https://llmstxt.org/). It does not guarantee citations, AI search placement or model ingestion.
 
