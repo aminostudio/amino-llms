@@ -17,6 +17,7 @@ jobs:
           set -euo pipefail
           php -l plugin/amino-llms/amino-llms.php
           test -s plugin/amino-llms/readme.txt
+          test -s plugin/amino-llms/uninstall.php
           test -s plugin/amino-llms/assets/admin.css
           test -f LICENSE
       - name: Build minimal installable plugin archive
@@ -24,7 +25,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist/amino-llms
-          cp plugin/amino-llms/amino-llms.php plugin/amino-llms/readme.txt dist/amino-llms/
+          cp plugin/amino-llms/amino-llms.php plugin/amino-llms/readme.txt plugin/amino-llms/uninstall.php dist/amino-llms/
           cp -R plugin/amino-llms/assets dist/amino-llms/
           cp LICENSE dist/amino-llms/LICENSE
           (cd dist && zip -qr amino-llms-1.2.0-rc.1.zip amino-llms)

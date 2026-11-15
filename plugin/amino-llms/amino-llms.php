@@ -298,7 +298,8 @@ final class Amino_LLMS {
         status_header(200);
         header('Content-Type: text/plain; charset=UTF-8');
         header('X-Content-Type-Options: nosniff');
-        echo $document; // Plain text Markdown, not HTML.
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- This endpoint is text/plain Markdown, not HTML; escaping changes link syntax.
+        echo $document;
         exit;
     }
 
@@ -312,11 +313,10 @@ final class Amino_LLMS {
         }
     }
 
-    private static function authorize(string $nonce): void {
+    private static function authorize(): void {
         if (!current_user_can('manage_options')) {
             wp_die(esc_html__('You cannot manage these settings.', 'amino-llms'));
         }
-        check_admin_referer($nonce);
     }
 
     private static function redirect(string $notice): void {
@@ -325,7 +325,8 @@ final class Amino_LLMS {
     }
 
     public static function save_settings(): void {
-        self::authorize('amino_llms_save');
+        self::authorize();
+        check_admin_referer('amino_llms_save');
         // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Each field is sanitized in clean_settings().
         $input = isset($_POST['amino_llms']) && is_array($_POST['amino_llms']) ? wp_unslash($_POST['amino_llms']) : [];
         $clean = self::clean_settings($input);
@@ -339,7 +340,8 @@ final class Amino_LLMS {
     }
 
     public static function restore_settings(): void {
-        self::authorize('amino_llms_restore');
+        self::authorize();
+        check_admin_referer('amino_llms_restore');
         $previous = get_option(self::PREVIOUS, null);
         if (!is_array($previous)) {
             self::redirect('nothing');
