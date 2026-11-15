@@ -4,7 +4,7 @@ Tags: llms-txt, markdown, ai, content
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.2.0
+Stable tag: 1.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -64,6 +64,11 @@ No. Amino LLMS is independent. Disable other llms.txt generators to avoid URL co
 
 == Changelog ==
 
+= 1.2.1 =
+* Pagination past the first 100 WordPress results when filtering out noindex and protected content.
+* Markdown-safe URLs with parentheses encoded.
+* Permalink diagnostic in the WordPress settings screen.
+
 = 1.2.0 =
 * New generic virtual /llms.txt endpoint: no root-file writes or cron.
 * Automatic, Manual and Hybrid document modes.
@@ -74,5 +79,5 @@ No. Amino LLMS is independent. Disable other llms.txt generators to avoid URL co
 
 == Upgrade Notice ==
 
-= 1.2.0 =
+= 1.2.1 =
 New generic implementation. The older site-specific Amino Studio Dynamic llms.txt v1.1 is a separate plugin, not an automatic update path.

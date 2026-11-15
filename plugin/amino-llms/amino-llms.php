@@ -3,7 +3,7 @@
  * Plugin Name: Amino LLMS
  * Plugin URI: https://github.com/aminostudio/amino-llms
  * Description: An editorial llms.txt for WordPress, with automatic, manual and hybrid modes.
- * Version: 1.2.0
+ * Version: 1.2.1
  * Requires at least: 6.4
  * Requires PHP: 8.0
  * Author: Amino Studio
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
  * Legacy site-specific v1.1 lives in a different directory and is not modified.
  */
 final class Amino_LLMS {
-    private const VERSION = '1.2.0';
+    private const VERSION = '1.2.1';
     private const OPTION = 'amino_llms_settings';
     private const PREVIOUS = 'amino_llms_previous_settings';
     private const CACHE = 'amino_llms_document_cache';
@@ -173,6 +173,12 @@ final class Amino_LLMS {
         return (bool) apply_filters('amino_llms_include_post', true, $post);
     }
 
+    private static function markdown_url(string $url): string {
+        // Markdown destination parentheses must be encoded, not interpreted
+        // as closing punctuation. Keep already encoded path characters intact.
+        return str_replace(['(', ')'], ['%28', '%29'], esc_url_raw($url));
+    }
+
     private static function link(WP_Post $post): string {
         $url = get_permalink($post);
         if (!is_string($url) || !in_array(strtolower((string) wp_parse_url($url, PHP_URL_SCHEME)), ['http', 'https'], true)) {
@@ -182,7 +188,7 @@ final class Amino_LLMS {
             return '';
         }
         $title = self::md_label((string) get_the_title($post));
-        return $title === '' ? '' : '- [' . $title . '](' . esc_url_raw($url) . ')';
+        return $title === '' ? '' : '- [' . $title . '](' . self::markdown_url($url) . ')';
     }
 
     public static function render(?array $settings = null): string {
@@ -241,27 +247,35 @@ final class Amino_LLMS {
             if (!isset($types[$post_type])) {
                 continue;
             }
-            $posts = get_posts([
-                'post_type' => $post_type,
-                'post_status' => 'publish',
-                'posts_per_page' => 100,
-                'orderby' => $post_type === 'page' ? ['menu_order' => 'ASC', 'title' => 'ASC'] : 'date',
-                'order' => 'DESC',
-                'ignore_sticky_posts' => true,
-                'suppress_filters' => false,
-            ]);
             $items = [];
-            foreach ($posts as $post) {
-                if (!($post instanceof WP_Post) || isset($seen[$post->ID]) || !self::allowed_post($post)) {
-                    continue;
+            // Work through a bounded window when recent posts are protected,
+            // noindexed or already in Highlights. One query is enough in most cases.
+            for ($batch = 0; $batch < 5; $batch++) {
+                $posts = get_posts([
+                    'post_type' => $post_type,
+                    'post_status' => 'publish',
+                    'posts_per_page' => 100,
+                    'offset' => $batch * 100,
+                    'orderby' => $post_type === 'page' ? ['menu_order' => 'ASC', 'title' => 'ASC'] : 'date',
+                    'order' => 'DESC',
+                    'ignore_sticky_posts' => true,
+                    'suppress_filters' => false,
+                ]);
+                foreach ($posts as $post) {
+                    if (!($post instanceof WP_Post) || isset($seen[$post->ID]) || !self::allowed_post($post)) {
+                        continue;
+                    }
+                    $row = self::link($post);
+                    if ($row === '') {
+                        continue;
+                    }
+                    $items[] = $row;
+                    $seen[$post->ID] = true;
+                    if (count($items) >= (int) $s['items_per_type']) {
+                        break;
+                    }
                 }
-                $row = self::link($post);
-                if ($row === '') {
-                    continue;
-                }
-                $items[] = $row;
-                $seen[$post->ID] = true;
-                if (count($items) >= (int) $s['items_per_type']) {
+                if (count($items) >= (int) $s['items_per_type'] || count($posts) < 100) {
                     break;
                 }
             }
@@ -383,6 +397,9 @@ final class Amino_LLMS {
         }
         if ($static_file) {
             echo '<div class="notice notice-warning"><p>' . esc_html__('An existing physical llms.txt was detected. Your web server may serve that file instead of the virtual document. Import its contents manually before renaming or removing it. This plugin never deletes or overwrites that file.', 'amino-llms') . '</p></div>';
+        }
+        if ((string) get_option('permalink_structure', '') === '') {
+            echo '<div class="notice notice-warning"><p>' . esc_html__('Pretty permalinks appear to be disabled. A virtual /llms.txt depends on WordPress rewrite rules and may not resolve on this server. Enable permalinks and test the public URL.', 'amino-llms') . '</p></div>';
         }
         echo '<div class="amino-llms-meta"><span>' . esc_html__('Delivery:', 'amino-llms') . ' <strong>' . esc_html__('Virtual /llms.txt', 'amino-llms') . '</strong></span><span>' . esc_html__('Mode:', 'amino-llms') . ' <strong>' . esc_html(ucfirst((string) $s['mode'])) . '</strong></span><span>v' . esc_html(self::VERSION) . '</span></div>';
         echo '<div class="amino-llms-grid"><div class="amino-llms-panel"><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="amino_llms_save">';
