@@ -241,6 +241,17 @@ final class Amino_LLMS {
         return trailingslashit(ABSPATH) . 'llms.txt';
     }
 
+    private static function filesystem(): object|WP_Error {
+        if (!function_exists('WP_Filesystem')) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+        }
+        global $wp_filesystem;
+        if (!WP_Filesystem() || !is_object($wp_filesystem) || $wp_filesystem->method !== 'direct') {
+            return new WP_Error('unsupported_filesystem', 'Direct WordPress filesystem access is required for a safe local-file replacement.');
+        }
+        return $wp_filesystem;
+    }
+
     private static function error(string $message): bool {
         update_option(self::ERROR, $message, false);
         return false;
@@ -277,14 +288,18 @@ final class Amino_LLMS {
         if (is_wp_error($path)) {
             return self::error($path->get_error_message());
         }
+        $fs = self::filesystem();
+        if (is_wp_error($fs)) {
+            return self::error($fs->get_error_message());
+        }
         if (is_link($path)) {
             return self::error('Refusing to overwrite an llms.txt symbolic link.');
         }
-        $exists = file_exists($path);
-        if ($exists && (!is_file($path) || !is_readable($path))) {
+        $exists = $fs->exists($path);
+        if ($exists && (!$fs->is_file($path) || !$fs->is_readable($path))) {
             return self::error('The existing llms.txt is not a readable regular file.');
         }
-        $previous = $exists ? @file_get_contents($path) : null;
+        $previous = $exists ? $fs->get_contents($path) : null;
         if ($exists && !is_string($previous)) {
             return self::error('The existing llms.txt could not be read.');
         }
@@ -295,7 +310,7 @@ final class Amino_LLMS {
         if (!$exists && $known !== '' && !$adopt) {
             return self::error('The previously managed file was removed. Publish explicitly before recreating it.');
         }
-        if (!is_writable(dirname($path)) || ($exists && !is_writable($path))) {
+        if (!$fs->is_writable(dirname($path)) || ($exists && !$fs->is_writable($path))) {
             return self::error('The llms.txt directory or file is not writable by PHP.');
         }
         if ($exists && $previous === $content) {
@@ -306,19 +321,26 @@ final class Amino_LLMS {
         if (is_string($previous) && strlen($previous) > self::MAX_BYTES) {
             return self::error('The previous llms.txt is too large for the built-in backup; refusing to replace it.');
         }
-        $temp = @tempnam(dirname($path), '.amino-llms-');
-        if (!is_string($temp) || dirname($temp) !== dirname($path)) {
-            return self::error('Cannot create a temporary file alongside llms.txt.');
+        $temp = dirname($path) . '/.amino-llms-' . wp_generate_uuid4() . '.tmp';
+        $mode = $exists ? octdec((string) $fs->getchmod($path)) : 0644;
+        if (!$mode) {
+            $mode = 0644;
         }
-        $old_mode = $exists ? @fileperms($path) : false;
-        @chmod($temp, $old_mode !== false ? ($old_mode & 0777) : 0644);
-        $written = @file_put_contents($temp, $content, LOCK_EX);
-        if ($written !== strlen($content) || !@rename($temp, $path)) {
-            @unlink($temp);
-            return self::error('Atomic write failed. The existing llms.txt was left intact.');
+        if (!$fs->put_contents($temp, $content, $mode)) {
+            $fs->delete($temp);
+            return self::error('Could not safely stage the new llms.txt in its destination directory.');
+        }
+        // WordPress' filesystem move(overwrite=true) DELETES the target before
+        // renaming. For direct/local filesystem installations, POSIX rename()
+        // performs an atomic replacement instead, keeping the old target intact
+        // on failure. The temporary file is always created in the same directory.
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename -- Required to avoid deleting the published file before replacement is committed.
+        if (!@rename($temp, $path)) {
+            $fs->delete($temp);
+            return self::error('Atomic replacement failed; the existing llms.txt was left intact.');
         }
         clearstatcache(true, $path);
-        if (@file_get_contents($path) !== $content) {
+        if ($fs->get_contents($path) !== $content) {
             return self::error('The written llms.txt failed readback verification.');
         }
         if ($exists) {
@@ -363,11 +385,10 @@ final class Amino_LLMS {
         }
     }
 
-    private static function authorize(string $nonce): void {
+    private static function authorize(): void {
         if (!current_user_can('manage_options')) {
             wp_die(esc_html__('You do not have permission to manage this document.', 'amino-llms'));
         }
-        check_admin_referer($nonce);
     }
 
     private static function redirect(string $state): void {
@@ -376,20 +397,25 @@ final class Amino_LLMS {
     }
 
     public static function save_settings(): void {
-        self::authorize('amino_llms_save');
+        self::authorize();
+        check_admin_referer('amino_llms_save');
+        // The received array is sanitized field-by-field by clean_settings().
+        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Centralized type-specific sanitization in clean_settings().
         $values = isset($_POST['amino_llms']) && is_array($_POST['amino_llms']) ? wp_unslash($_POST['amino_llms']) : [];
         update_option(self::OPT, self::clean_settings($values), false);
         self::redirect('saved');
     }
 
     public static function publish(): void {
-        self::authorize('amino_llms_publish');
+        self::authorize();
+        check_admin_referer('amino_llms_publish');
         $adopt = isset($_POST['amino_llms_confirm_replace']) && $_POST['amino_llms_confirm_replace'] === '1';
         self::redirect(self::write_document(self::render_document(), $adopt) ? 'published' : 'error');
     }
 
     public static function restore(): void {
-        self::authorize('amino_llms_restore');
+        self::authorize();
+        check_admin_referer('amino_llms_restore');
         $backup = get_option(self::BACKUP, null);
         if (!is_array($backup) || !is_string($backup['content'] ?? null)) {
             self::redirect('error');
@@ -413,6 +439,7 @@ final class Amino_LLMS {
         $exists = !is_wp_error($path) && is_file($path);
         $tracked = get_option(self::HASH, '') !== '';
         $conflict = self::legacy_conflict();
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only admin notice, no state change.
         $notice = isset($_GET['amino_llms_notice']) ? sanitize_key(wp_unslash($_GET['amino_llms_notice'])) : '';
         echo '<div class="wrap amino-llms-admin"><div class="amino-llms-hero"><span class="amino-llms-kicker">AMINO / LLMS</span><h1>A clear guide to your website.</h1><p>Build a concise, curated Markdown introduction for AI agents. Your website, your words, your control.</p></div>';
         if ($notice) {

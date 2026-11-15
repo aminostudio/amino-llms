@@ -75,6 +75,22 @@ function get_the_title(WP_Post $post): string {return $post->post_title;}
 function home_url($path='/'): string {return 'https://example.test'.$path;}
 function site_url($path='/'): string {return 'https://example.test'.$path;}
 function wp_parse_url($url,$component=null): mixed{return parse_url($url,$component);}
+function wp_generate_uuid4(): string{return bin2hex(random_bytes(12));}
+class Mock_WP_Filesystem_Direct {
+    public string $method = 'direct';
+    public function exists(string $path): bool{return file_exists($path);}
+    public function is_file(string $path): bool{return is_file($path);}
+    public function is_readable(string $path): bool{return is_readable($path);}
+    public function is_writable(string $path): bool{return is_writable($path);}
+    public function get_contents(string $path): string|false{return file_get_contents($path);}
+    public function getchmod(string $path): string{return '644';}
+    public function put_contents(string $path,string $content,int $mode): bool{return file_put_contents($path,$content) === strlen($content);}
+    public function delete(string $path): bool{return file_exists($path) ? unlink($path) : true;}
+}
+function WP_Filesystem(): bool{
+    $GLOBALS['wp_filesystem'] = new Mock_WP_Filesystem_Direct();
+    return true;
+}
 function esc_url_raw($url): string {return $url;}
 function wp_strip_all_tags($text): string {return strip_tags($text);}
 function apply_filters($hook,$value,...$args): mixed{return $value;}
