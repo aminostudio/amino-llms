@@ -32,7 +32,7 @@ jobs:
           grep -q '^# ' /tmp/amino-llms.txt
           grep -q '^## Main Pages' /tmp/amino-llms.txt
           # Test the actual public endpoint in all three modes.
-          wp-env run cli wp eval '$s = Amino_LLMS::settings(); $s["mode"] = "manual"; $s["manual_markdown"] = "# Manual Smoke\\n\\n## Resources\\n- [Home](https://example.org/)"; update_option("amino_llms_settings", $s, false); Amino_LLMS::invalidate();'
+          wp-env run cli wp eval '$s = Amino_LLMS::settings(); $s["mode"] = "manual"; $s["manual_markdown"] = "# Manual Smoke\n\n## Resources\n- [Home](https://example.org/)"; update_option("amino_llms_settings", $s, false); Amino_LLMS::invalidate();'
           curl -fsS http://localhost:8880/llms.txt -o /tmp/amino-manual.txt
           grep -q '^# Manual Smoke' /tmp/amino-manual.txt
           grep -q '^## Resources' /tmp/amino-manual.txt
@@ -40,7 +40,7 @@ jobs:
           curl -fsS http://localhost:8880/llms.txt -o /tmp/amino-automatic.txt
           grep -q '^## Main Pages' /tmp/amino-automatic.txt
           ! grep -q '^# Manual Smoke' /tmp/amino-automatic.txt
-          wp-env run cli wp eval '$s = Amino_LLMS::settings(); $s["mode"] = "hybrid"; $s["introduction"] = "A curator's editorial introduction."; update_option("amino_llms_settings", $s, false); Amino_LLMS::invalidate();'
+          wp-env run cli wp eval '$s = Amino_LLMS::settings(); $s["mode"] = "hybrid"; $s["introduction"] = "A carefully written editorial introduction."; update_option("amino_llms_settings", $s, false); Amino_LLMS::invalidate();'
           curl -fsS http://localhost:8880/llms.txt -o /tmp/amino-hybrid.txt
           grep -q 'editorial introduction' /tmp/amino-hybrid.txt
           wp-env run cli wp eval 'if (file_exists(ABSPATH . "llms.txt")) { WP_CLI::error("Unexpected physical llms.txt was created"); } WP_CLI::success("No root-file writes");'
