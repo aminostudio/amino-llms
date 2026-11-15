@@ -80,4 +80,4 @@ No. Amino LLMS is independent. Disable other llms.txt generators to avoid URL co
 == Upgrade Notice ==
 
 = 1.2.1 =
-New generic implementation. The older site-specific Amino Studio Dynamic llms.txt v1.1 is a separate plugin, not an automatic update path.
+Maintenance update: more reliable discovery of recent public content and URL formatting. The older site-specific Amino Studio Dynamic llms.txt v1.1 is a separate plugin, not an automatic update path.
