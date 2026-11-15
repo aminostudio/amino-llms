@@ -70,7 +70,7 @@ function get_post_meta($id, $key, $single = true): mixed {return $GLOBALS['post_
 function get_posts($args): array {
     $items = array_filter($GLOBALS['posts'], fn($post) => $post->post_type === $args['post_type'] && $post->post_status === 'publish');
     usort($items, fn($a, $b) => strcmp($b->post_date, $a->post_date));
-    return array_slice($items, 0, $args['posts_per_page'] ?? 6);
+    return array_slice($items, $args['offset'] ?? 0, $args['posts_per_page'] ?? 6);
 }
 function get_permalink(WP_Post $post): string {return 'https://example.test/' . $post->post_name . '/';}
 function get_the_title(WP_Post $post): string {return $post->post_title;}
@@ -145,6 +145,24 @@ check(!str_contains($doc, 'Yoast hidden'), 'Yoast noindex content excluded');
 check(!str_contains($doc, 'Rank Math hidden'), 'Rank Math noindex content excluded');
 check(!str_contains($doc, 'Password story'), 'Password-protected content excluded');
 check(!str_contains($doc, 'Private story'), 'Private content excluded');
+$odd = new WP_Post(90, 'post', 'publish', 'Story with (parentheses)', 'a(test)', '2026-11-10');
+$GLOBALS['posts'][] = $odd;
+check(str_contains(Amino_LLMS::render($hybrid), '/a%28test%29/'), 'Generated Markdown safely encodes URL parentheses');
+array_pop($GLOBALS['posts']);
+
+// The 100 newest results can all be excluded; the generator must keep looking.
+foreach (range(1000, 1104) as $id) {
+    $GLOBALS['posts'][] = new WP_Post($id, 'post', 'publish', 'Noindex ' . $id, 'excluded-' . $id, '2026-12-01');
+    $GLOBALS['post_meta'][$id] = ['_yoast_wpseo_meta-robots-noindex' => '1'];
+}
+$scanning = $hybrid;
+$scanning['highlight_ids'] = '';
+$scanning['post_types'] = ['post'];
+$scanned = Amino_LLMS::render($scanning);
+check(str_contains($scanned, 'A cultural investigation'), 'Paged discovery finds public content after 100+ excluded posts');
+check(!str_contains($scanned, 'Noindex 1000'), 'Paged discovery never includes noindexed posts');
+$GLOBALS['posts'] = array_values(array_filter($GLOBALS['posts'], static fn($p) => $p->ID < 1000));
+
 check(Amino_LLMS::valid_document($doc), 'Generated Markdown valid');
 check(!Amino_LLMS::valid_document('This is not Markdown with a title'), 'Document without top heading rejected');
 check(!Amino_LLMS::valid_document('# Title' . str_repeat('x', 140000)), 'Oversized document rejected');

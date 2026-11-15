@@ -4,6 +4,8 @@
 
 **Your website, clearly understood.**
 
+**v1.2.1** improves discovery beyond excluded items, Markdown link encoding and rewrite diagnostics.
+
 Amino LLMS is an independent, lightweight WordPress plugin for publishing a human-guided `llms.txt` in Markdown. **Automatic, Manual, and Hybrid** modes let site owners explain what matters rather than dumping a complete XML sitemap.
 
 **No external AI service. No telemetry. No server-root file writes.**
