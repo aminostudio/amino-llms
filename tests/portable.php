@@ -51,6 +51,7 @@ function add_action(...$args): void {}
 function add_filter(...$args): void {}
 function register_activation_hook(...$args): void {}
 function register_deactivation_hook(...$args): void {}
+function get_query_var($key): string {return (string) ($GLOBALS['query'][$key] ?? '');}
 function add_rewrite_rule($rule, $query, $position): void {$GLOBALS['routes'][] = compact('rule', 'query', 'position');}
 function flush_rewrite_rules($hard = true): void {$GLOBALS['flushed']++;}
 function get_bloginfo($key): string {return (string) ($GLOBALS['options'][$key === 'name' ? 'blogname' : 'blogdescription'] ?? '');}
@@ -92,6 +93,9 @@ function check(bool $condition, string $message): void {
     echo 'PASS ' . (++$checks) . ': ' . $message . PHP_EOL;
 }
 Amino_LLMS::activate();
+$GLOBALS['query']['amino_llms_document']='1';
+check(Amino_LLMS::skip_canonical('https://example.test/llms.txt/','https://example.test/llms.txt') === false, 'Canonical redirects disabled for virtual document');
+unset($GLOBALS['query']['amino_llms_document']);
 check($GLOBALS['flushed'] === 1, 'Activation flushes rewrite rules');
 check($GLOBALS['routes'][0]['rule'] === '^llms\.txt/?$', 'Registered virtual llms.txt route');
 check(!file_exists($root . 'llms.txt'), 'Activation creates no root file');

@@ -31,6 +31,7 @@ final class Amino_LLMS {
     public static function boot(): void {
         add_action('init', [__CLASS__, 'add_route']);
         add_filter('query_vars', [__CLASS__, 'query_vars']);
+        add_filter('redirect_canonical', [__CLASS__, 'skip_canonical'], 10, 2);
         add_action('template_redirect', [__CLASS__, 'serve']);
         add_action('admin_menu', [__CLASS__, 'admin_menu']);
         add_action('admin_enqueue_scripts', [__CLASS__, 'admin_assets']);
@@ -65,6 +66,10 @@ final class Amino_LLMS {
     public static function query_vars(array $vars): array {
         $vars[] = 'amino_llms_document';
         return $vars;
+    }
+
+    public static function skip_canonical($redirect, $requested) {
+        return (string) get_query_var('amino_llms_document') === '1' ? false : $redirect;
     }
 
     public static function defaults(): array {
