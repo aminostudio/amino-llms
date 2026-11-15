@@ -8,7 +8,7 @@
 
 **A sitemap lists everything. An editorial guide explains what matters.**
 
-> **Development preview, not a general-purpose plugin release.** The bundled v1.1.0 engine is a production-tested, *Amino Studio-specific* implementation. It hardcodes ACTA, Ziryab and Amino Studio conventions. **Do not install it unchanged on unrelated WordPress sites.** Portability is the first milestone.
+> **Development status:** the existing v1.1.0 engine is specific to Amino Studio and remains in `plugin/amino-llms-dynamic/`. A **portable 1.2.0-beta.1** prototype is now available in `plugin/amino-llms/` on the feature branch. Neither is a WordPress.org release. Do not install both on the same site.
 
 ## Why build this?
 
@@ -33,23 +33,51 @@ The existing site-specific engine:
 
 **Limitations:** Existing writable root file required. Site-specific headings and URLs are hardcoded. WordPress cron depends on traffic or a server cron. There is no general-purpose manual Markdown editor, no reusable post-type picker and no WordPress.org-ready installer yet.
 
-## Product vision
+## Portable core · v1.2.0-beta.1
 
-| Mode (planned) | Result |
+The new, **separate** development plugin lives at `plugin/amino-llms/`. It does not have hardcoded ACTA, Ziryab, or Amino Studio URLs.
+
+| Document mode | Current beta behavior |
 | --- | --- |
-| **Automatic** | A site-aware document maintained from publicly published content |
-| **Manual** | Full Markdown editing, review and deliberate publication |
-| **Hybrid** | A written identity and curated references combined with automatically updated links |
+| **Automatic** | Generates a Markdown guide from site details and public WordPress content |
+| **Manual** | Publishes an administrator-authored Markdown document |
+| **Hybrid** | Combines a written introduction with automatically updated public links |
 
-Additional goals: visual content selection, preview before publishing, validation, noindex/private-content filtering, safe import and rollback, multilingual admin, and portable WordPress configuration.
+Current features:
+- Configure the site title, summary, introduction, source post types, content count and highlighted IDs.
+- Preview Markdown in a WordPress settings screen before publication.
+- Keep `llms.txt` intact on plugin activation and reject unapproved overwrites.
+- Detect external modifications via a stored SHA-256 checksum.
+- Keep the previous text as a restore point in a non-autoloaded WordPress option.
+- Refuse symlinks, oversized or structurally invalid documents, and simultaneous use of the legacy plugin.
+- Exclude drafts, private/password-protected content and commonly used noindex metadata (Yoast and Rank Math).
+- Update a **previously managed** document after relevant content changes or via hourly WP-Cron, when enabled.
 
-The future interface must remain accessible, lightweight and self-hosted. See [the roadmap](ROADMAP.md), [brand copy](docs/brand-copy.md) and [release checklist](docs/release-checklist.md).
+**Not yet production certified:** generic real-WordPress integration tests, multisite, installation-directory mismatch, comprehensive SEO-plugin visibility rules, concurrency review, visual picker, translated UI and formal WordPress Plugin Check. Review the [release checklist](docs/release-checklist.md).
+
+### Test the portable beta (staging only)
+
+1. Ensure the legacy `Amino Studio — Dynamic llms.txt` plugin is **not active**.
+2. Copy or ZIP the directory **`plugin/amino-llms/`**, with that directory as the WordPress plugin folder.
+3. Activate it on a **staging** WordPress install, then open **Settings → Amino LLMS**.
+4. Choose a document mode, save settings, inspect the Markdown preview and **publish explicitly**.
+5. If a root `llms.txt` already exists, deliberately confirm its replacement only after reviewing its content. A restore point is stored inside WordPress.
+
+Neither activation nor saving settings silently publishes to the root of the site.
+
+## Product direction
+
+The hybrid mode is the recommended starting point: a human introduction plus machine-maintained links. The 1.3 roadmap focuses on a polished searchable content picker, broader configuration, stronger rollback, URL diagnostics and accessibility. **No claim of guaranteed AI indexing, citation or ranking.**
+
+See the [roadmap](ROADMAP.md), [brand copy](docs/brand-copy.md) and [release checklist](docs/release-checklist.md).
 
 ## Repository layout
 
 ```text
-plugin/amino-llms-dynamic/    Existing 1.1.0 implementation (site-specific)
-tests/run.php                 Local WordPress-function mock tests
+plugin/amino-llms-dynamic/    Legacy 1.1.0 implementation (site-specific)
+plugin/amino-llms/            Portable 1.2 beta implementation + admin CSS
+tests/run.php                 Legacy WordPress-function mock tests
+tests/portable.php            Portable core WordPress-function mock tests
 .github/workflows/            PHP lint and test matrix
 assets/brand-mark.svg         Brand identity concept
 docs/                         Product direction and release checklist
@@ -57,14 +85,16 @@ docs/                         Product direction and release checklist
 
 ## Development and verification
 
-Requires PHP 8.0+ to run the existing implementation. Run:
+Requires PHP 8.0+ for both implementations. Run:
 
 ```bash
 php -l plugin/amino-llms-dynamic/amino-llms-dynamic.php
+php -l plugin/amino-llms/amino-llms.php
 php tests/run.php
+php tests/portable.php
 ```
 
-The test runner mocks WordPress functions. It exercises migration, idempotence, marker failures, highlights, scheduling and symlink handling. **Mock tests are not a substitute for integration tests on real WordPress installations.** Do not package this repository as a generic production ZIP yet.
+Both test runners mock WordPress functions, including publication, file safety, noindex filtering and content selection. They run on PHP 8.0/8.2/8.4 in GitHub Actions. **Mocks do not establish real WordPress compatibility or make the beta ready for WordPress.org.**
 
 ## Safety and privacy
 

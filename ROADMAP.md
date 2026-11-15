@@ -2,16 +2,16 @@
 
 The **1.1.0 source is deliberately preserved** as a site-specific production baseline. Planned functionality is not claimed as shipped.
 
-## Phase 1 · Portable core
+## Phase 1 · Portable core (1.2 beta implemented, real-site verification pending)
 
-- [ ] Remove all ACTA, Ziryab, Amino Studio and domain-specific assumptions.
-- [ ] Discover public WordPress post types and allow users to include/exclude types.
-- [ ] Safely detect and import an existing llms.txt without changing it.
-- [ ] Generate a starter document on new installations only with administrator approval.
-- [ ] Support **Automatic**, **Manual** and **Hybrid** document modes.
+- [x] Create a separate portable 1.2 beta without ACTA, Ziryab, Amino Studio or domain-specific assumptions.
+- [x] Discover public WordPress post types and allow users to include/exclude types.
+- [ ] Improve import experience (safe refusal and explicit replacement implemented; guided import pending).
+- [x] Require explicit administrator publication, never write on activation.
+- [x] Prototype **Automatic**, **Manual** and **Hybrid** document modes (staging tests pending).
 - [ ] Keep featured-article selection independent of document-generation mode.
-- [ ] Configure document sections, ordering, limits and URLs.
-- [ ] Exclude drafts, password-protected, private and noindex entries.
+- [ ] Add advanced section ordering and link selection (post type and count controls already in beta).
+- [ ] Fully exclude private/noindex content across supported SEO plugins (basic Yoast and Rank Math filtering implemented).
 - [ ] Handle WordPress in subdirectories and detect generators/route conflicts.
 
 ## Phase 2 · Exceptional WordPress administration
