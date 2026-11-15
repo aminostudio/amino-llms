@@ -82,6 +82,7 @@ function apply_filters($hook, $value, ...$args): mixed {return $value;}
 function sanitize_key($value): string {return preg_replace('/[^a-z0-9_-]/', '', strtolower((string) $value));}
 function sanitize_text_field($value): string {return trim(strip_tags((string) $value));}
 function sanitize_textarea_field($value): string {return trim(strip_tags((string) $value));}
+function wp_check_invalid_utf8($text, $strip = false): string {return (string) $text;}
 function absint($v): int {return abs((int) $v);}
 function trailingslashit($value): string {return rtrim($value, '/') . '/';}
 require dirname(__DIR__) . '/plugin/amino-llms/amino-llms.php';
@@ -112,7 +113,7 @@ $clean = Amino_LLMS::clean_settings([
     'post_types' => ['book', 'page', 'private_cpt', 'attachment', 'book'],
     'items_per_type' => 500,
     'highlight_ids' => '1,2,1,invalid,-9',
-    'manual_markdown' => '# My manually created llms.txt' . "\n\n" . '## Projects',
+    'manual_markdown' => '# My manually created llms.txt' . "\n\n" . '## Projects' . "\n" . '- [Encoded](https://example.test/my%20file.pdf)',
 ]);
 check($clean['mode'] === 'manual', 'Manual mode recognized');
 check($clean['post_types'] === ['page', 'book'], 'Nonpublic, media and repeated types excluded');
@@ -120,6 +121,7 @@ check($clean['items_per_type'] === 25, 'Per-type limit enforced');
 check($clean['highlight_ids'] === '1,2', 'Highlights sanitized and deduplicated');
 check($clean['summary'] === 'A small website', 'HTML stripped from short summary');
 check(Amino_LLMS::valid_document(Amino_LLMS::render($clean)), 'Manual Markdown is accepted with a top heading');
+check(str_contains(Amino_LLMS::render($clean), 'my%20file.pdf'), 'Manual Markdown preserves percent-encoded URLs');
 
 $hybrid = Amino_LLMS::clean_settings([
     'mode' => 'hybrid',

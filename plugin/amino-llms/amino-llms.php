@@ -122,12 +122,20 @@ final class Amino_LLMS {
             'mode' => $mode,
             'site_name' => self::limit(sanitize_text_field((string) ($input['site_name'] ?? '')), 160),
             'summary' => self::limit(sanitize_text_field((string) ($input['summary'] ?? '')), 500),
-            'introduction' => self::limit(sanitize_textarea_field((string) ($input['introduction'] ?? '')), 12000),
-            'manual_markdown' => self::limit(sanitize_textarea_field((string) ($input['manual_markdown'] ?? '')), self::MAX_BYTES),
+            // Markdown is plain text, not HTML. Preserve percent-encoded links and code fences.
+            'introduction' => self::sanitize_markdown((string) ($input['introduction'] ?? ''), 12000),
+            'manual_markdown' => self::sanitize_markdown((string) ($input['manual_markdown'] ?? ''), self::MAX_BYTES),
             'post_types' => $selected,
             'items_per_type' => max(1, min(25, absint($input['items_per_type'] ?? 8))),
             'highlight_ids' => implode(',', array_slice($ids, 0, 10)),
         ];
+    }
+
+    private static function sanitize_markdown(string $value, int $max_bytes): string {
+        // Safe as text/plain; it is escaped as text when shown in WordPress admin.
+        $value = wp_check_invalid_utf8($value, true);
+        $value = (string) preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $value);
+        return self::limit($value, $max_bytes);
     }
 
     private static function limit(string $value, int $bytes): string {
