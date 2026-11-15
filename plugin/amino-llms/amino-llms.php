@@ -241,7 +241,7 @@ final class Amino_LLMS {
         return trailingslashit(ABSPATH) . 'llms.txt';
     }
 
-    private static function filesystem(): object|WP_Error {
+    private static function filesystem(): mixed {
         if (!function_exists('WP_Filesystem')) {
             require_once ABSPATH . 'wp-admin/includes/file.php';
         }
