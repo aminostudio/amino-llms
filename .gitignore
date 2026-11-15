@@ -1,0 +1,11 @@
+.DS_Store
+.idea/
+.vscode/
+vendor/
+node_modules/
+*.log
+*.swp
+*.swo
+*.zip
+coverage/
+.phpunit.result.cache
