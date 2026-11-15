@@ -28,15 +28,44 @@ jobs:
           cp plugin/amino-llms/amino-llms.php plugin/amino-llms/readme.txt plugin/amino-llms/uninstall.php dist/amino-llms/
           cp -R plugin/amino-llms/assets dist/amino-llms/
           cp LICENSE dist/amino-llms/LICENSE
-          (cd dist && zip -qr amino-llms-1.2.0-rc.1.zip amino-llms)
-          unzip -l dist/amino-llms-1.2.0-rc.1.zip
-          test "$(unzip -Z1 dist/amino-llms-1.2.0-rc.1.zip | grep -c 'amino-llms/amino-llms.php')" -eq 1
-          ! unzip -Z1 dist/amino-llms-1.2.0-rc.1.zip | grep -Eq '(^|/)(tests|\.github|vendor|node_modules)/'
-          sha256sum dist/amino-llms-1.2.0-rc.1.zip > dist/SHA256SUMS.txt
+          (cd dist && zip -qr amino-llms-1.2.0.zip amino-llms)
+          unzip -l dist/amino-llms-1.2.0.zip
+          test "$(unzip -Z1 dist/amino-llms-1.2.0.zip | grep -c 'amino-llms/amino-llms.php')" -eq 1
+          ! unzip -Z1 dist/amino-llms-1.2.0.zip | grep -Eq '(^|/)(tests|\.github|vendor|node_modules)/'
+          sha256sum dist/amino-llms-1.2.0.zip > dist/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: amino-llms-installable-rc1
+          name: amino-llms-installable-v1.2.0
           path: |
-            dist/amino-llms-1.2.0-rc.1.zip
+            dist/amino-llms-1.2.0.zip
             dist/SHA256SUMS.txt
           if-no-files-found: error
+
+  release:
+    name: Publish testable GitHub prerelease
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: amino-llms-installable-v1.2.0
+          path: dist
+      - name: Publish installable ZIP and checksum
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view v1.2.0 >/dev/null 2>&1; then
+            echo "GitHub release v1.2.0 already exists; leaving it unchanged."
+            exit 0
+          fi
+          sha256sum -c dist/SHA256SUMS.txt
+          gh release create v1.2.0 dist/amino-llms-1.2.0.zip dist/SHA256SUMS.txt \
+            --title 'Amino LLMS v1.2.0' \
+            --notes-file docs/release-notes-v1.2.0.md \
+            --prerelease
