@@ -1,0 +1,47 @@
+name: WordPress Plugin Check & runtime
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  plugin-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Official Plugin Check
+        uses: wordpress/plugin-check-action@v1
+        with:
+          build-dir: ./plugin/amino-llms
+          slug: amino-llms
+      - name: Runtime route and rendering smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          wp-env run cli wp option update permalink_structure '/%postname%/'
+          wp-env run cli wp rewrite flush
+          wp-env run cli wp eval 'if (!class_exists("Amino_LLMS")) { WP_CLI::error("Plugin was not activated"); } if (!Amino_LLMS::valid_document(Amino_LLMS::render())) { WP_CLI::error("Invalid Markdown"); } WP_CLI::success("Amino LLMS renders on WordPress");'
+          curl --fail --silent --show-error --retry 4 --retry-delay 2 -D /tmp/amino-headers.txt http://localhost:8880/llms.txt -o /tmp/amino-llms.txt
+          echo "--- Response headers ---"
+          cat /tmp/amino-headers.txt
+          echo "--- Response body (first 1500 bytes) ---"
+          head -c 1500 /tmp/amino-llms.txt
+          echo
+          grep -qi 'content-type: text/plain' /tmp/amino-headers.txt
+          grep -q '^# ' /tmp/amino-llms.txt
+          grep -q '^## Main Pages' /tmp/amino-llms.txt
+          # Test the actual public endpoint in all three modes.
+          wp-env run cli wp eval '$s = Amino_LLMS::settings(); $s["mode"] = "manual"; $s["manual_markdown"] = "# Manual Smoke\n\n## Resources\n- [Home](https://example.org/)"; update_option("amino_llms_settings", $s, false); Amino_LLMS::invalidate();'
+          curl -fsS http://localhost:8880/llms.txt -o /tmp/amino-manual.txt
+          grep -q '^# Manual Smoke' /tmp/amino-manual.txt
+          grep -q '^## Resources' /tmp/amino-manual.txt
+          wp-env run cli wp eval '$s = Amino_LLMS::settings(); $s["mode"] = "automatic"; update_option("amino_llms_settings", $s, false); Amino_LLMS::invalidate();'
+          curl -fsS http://localhost:8880/llms.txt -o /tmp/amino-automatic.txt
+          grep -q '^## Main Pages' /tmp/amino-automatic.txt
+          ! grep -q '^# Manual Smoke' /tmp/amino-automatic.txt
+          wp-env run cli wp eval '$s = Amino_LLMS::settings(); $s["mode"] = "hybrid"; $s["introduction"] = "A carefully written editorial introduction."; update_option("amino_llms_settings", $s, false); Amino_LLMS::invalidate();'
+          curl -fsS http://localhost:8880/llms.txt -o /tmp/amino-hybrid.txt
+          grep -q 'editorial introduction' /tmp/amino-hybrid.txt
+          wp-env run cli wp eval 'if (file_exists(ABSPATH . "llms.txt")) { WP_CLI::error("Unexpected physical llms.txt was created"); } WP_CLI::success("No root-file writes");'
+          echo "All virtual delivery modes passed HTTP smoke tests."

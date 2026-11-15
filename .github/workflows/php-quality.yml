@@ -17,7 +17,13 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: none
-      - name: PHP syntax
+      - name: PHP syntax (legacy)
         run: php -l plugin/amino-llms-dynamic/amino-llms-dynamic.php
-      - name: Local WordPress-function mocks
+      - name: PHP syntax (portable beta)
+        run: php -l plugin/amino-llms/amino-llms.php
+      - name: PHP syntax (tests)
+        run: php -l tests/run.php && php -l tests/portable.php
+      - name: Legacy tests
         run: php tests/run.php
+      - name: Portable engine tests
+        run: php tests/portable.php

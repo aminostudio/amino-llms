@@ -4,78 +4,50 @@
 
 **Your website, clearly understood.**
 
-**Amino LLMS** is an open-source WordPress project for creating and maintaining a useful, curated `llms.txt`: a Markdown guide that helps compatible AI agents navigate the most important parts of your website.
+Amino LLMS is an independent, lightweight WordPress plugin for publishing a human-guided `llms.txt` in Markdown. **Automatic, Manual, and Hybrid** modes let site owners explain what matters rather than dumping a complete XML sitemap.
 
-**A sitemap lists everything. An editorial guide explains what matters.**
+**No external AI service. No telemetry. No server-root file writes.**
 
-> **Development preview, not a general-purpose plugin release.** The bundled v1.1.0 engine is a production-tested, *Amino Studio-specific* implementation. It hardcodes ACTA, Ziryab and Amino Studio conventions. **Do not install it unchanged on unrelated WordPress sites.** Portability is the first milestone.
+## What ships in 1.2.0-rc.1
 
-## Why build this?
+- Automatic mode: site identity and links to recently published public content.
+- Manual mode: complete Markdown authoring in the WordPress admin.
+- Hybrid mode: editorial introduction plus automatically generated links.
+- Select public WordPress post types, a link limit and featured post IDs.
+- Markdown preview and a one-step restore of prior settings.
+- Filter private, draft, password-protected and common noindex content.
+- Serve **/llms.txt** through WordPress rewrite, with short-lived caching and cache invalidation after content updates.
+- Show a warning when an existing physical `llms.txt` may take precedence.
 
-- **Editorial first.** Your organization describes itself in its own words.
-- **Fresh resources.** WordPress keeps published links up to date.
-- **Curated highlights.** Important work need not disappear behind chronology.
-- **Plain Markdown.** No external AI service, API key, tracking or opaque scoring.
-- **SEO-independent.** Complements an XML sitemap and can coexist with Yoast when its own llms.txt generator is disabled.
-- **Transparent code.** GPL-licensed, local, inspectable and open to contributions.
+**Why virtual delivery?** It eliminates filesystem permissions and destructive updates for most installations. The plugin never removes existing static files. Server and competing-plugin routing still need attention.
 
-## What v1.1.0 actually does
+### Developer build
 
-The existing site-specific engine:
-
-- Updates a delimited dynamic section of a pre-existing root `llms.txt`, preserving surrounding editorial copy.
-- Lists ACTA highlights and six newer articles, avoiding repeated links across these lists.
-- Lists recently updated entries of the `amino_project` custom post type.
-- Provides **Automatic / Editorial** modes for **featured articles**, *not* for the entire document.
-- Reacts to relevant WordPress post changes, with an hourly WP-Cron fallback.
-- Detects invalid markers, checks file permissions and verifies writes.
-- Migrates the existing 1.0.0 selections without silently changing their editorial order.
-
-**Limitations:** Existing writable root file required. Site-specific headings and URLs are hardcoded. WordPress cron depends on traffic or a server cron. There is no general-purpose manual Markdown editor, no reusable post-type picker and no WordPress.org-ready installer yet.
-
-## Product vision
-
-| Mode (planned) | Result |
-| --- | --- |
-| **Automatic** | A site-aware document maintained from publicly published content |
-| **Manual** | Full Markdown editing, review and deliberate publication |
-| **Hybrid** | A written identity and curated references combined with automatically updated links |
-
-Additional goals: visual content selection, preview before publishing, validation, noindex/private-content filtering, safe import and rollback, multilingual admin, and portable WordPress configuration.
-
-The future interface must remain accessible, lightweight and self-hosted. See [the roadmap](ROADMAP.md), [brand copy](docs/brand-copy.md) and [release checklist](docs/release-checklist.md).
-
-## Repository layout
-
-```text
-plugin/amino-llms-dynamic/    Existing 1.1.0 implementation (site-specific)
-tests/run.php                 Local WordPress-function mock tests
-.github/workflows/            PHP lint and test matrix
-assets/brand-mark.svg         Brand identity concept
-docs/                         Product direction and release checklist
-```
-
-## Development and verification
-
-Requires PHP 8.0+ to run the existing implementation. Run:
+Production-installable ZIPs are created by [GitHub Actions](.github/workflows/package.yml), not from the entire GitHub repository.
 
 ```bash
-php -l plugin/amino-llms-dynamic/amino-llms-dynamic.php
-php tests/run.php
+php -l plugin/amino-llms/amino-llms.php
+php tests/portable.php
 ```
 
-The test runner mocks WordPress functions. It exercises migration, idempotence, marker failures, highlights, scheduling and symlink handling. **Mock tests are not a substitute for integration tests on real WordPress installations.** Do not package this repository as a generic production ZIP yet.
+CI also runs WordPress Plugin Check and an HTTP smoke test against a disposable WordPress instance. See [ROADMAP.md](ROADMAP.md) for remaining work and [SECURITY.md](SECURITY.md) for reporting.
 
-## Safety and privacy
+### Migration from Amino Studio 1.1
 
-Amino LLMS does not need to send website content to a third-party AI platform. In the general-purpose version, pre-existing `llms.txt` files must never be silently overwritten. This is a core release criterion, not a claim about the current 1.1.0.
+The site-specific legacy implementation lives at `plugin/amino-llms-dynamic/`. It is **not** the same plugin or an automatic update. Preserve your existing `llms.txt`, deactivate the old generator, import your editorial content into the new Manual or Hybrid mode, and *only then* rename the physical `llms.txt` so WordPress can serve the virtual endpoint. Verify the public URL before switching any production site.
 
-For vulnerabilities see [SECURITY.md](SECURITY.md). For contributions see [CONTRIBUTING.md](CONTRIBUTING.md).
+### Honest limitations
 
-## About `llms.txt`
+This is a release candidate undergoing real-world testing, not yet an approved WordPress.org listing. The editor currently uses a comma-separated field for highlighted IDs. More sophisticated content search and multilingual settings are future improvements, not release blockers.
 
-The format is a [community proposal](https://llmstxt.org/), not a guarantee that any AI model will ingest, quote or rank your website. A good `llms.txt` adds structured guidance; it does not replace your website, `robots.txt`, structured data or XML sitemap.
+An `llms.txt` is a [community-proposed discovery format](https://llmstxt.org/). It does not guarantee citations, AI search placement or model ingestion.
 
-## Licence
+## Repository
 
-[GPL-2.0-or-later](LICENSE) · © Amino Studio.
+- `plugin/amino-llms/`: **distributable WordPress plugin**.
+- `plugin/amino-llms-dynamic/`: archived Amino Studio 1.1 site-specific reference.
+- `tests/`: mock-based regression suites.
+- `.github/workflows/`: PHP matrix, Plugin Check, runtime and installable ZIP build.
+- `ROADMAP.md`: remaining work.
+
+GPL-2.0-or-later · © Amino Studio.
