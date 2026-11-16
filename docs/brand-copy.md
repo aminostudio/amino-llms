@@ -1,12 +1,12 @@
 # Brand and messaging
 
-**Product:** Amino LLMS
+**Product:** LLMs.txt Composer
 
 **Tagline:** Your website, clearly understood.
 
 **GitHub About:** Editorially controlled llms.txt for WordPress. Curate essential pages, automate fresh links, and keep Markdown accurate.
 
-**Elevator pitch:** A sitemap is a list. Amino LLMS is an introduction. It helps WordPress site owners create a concise, accurate guide to their work for compatible AI agents. Write your own description, feature the pages that matter, and let WordPress keep new publications discoverable. No external AI account and no loss of editorial control.
+**Elevator pitch:** A sitemap is a list. LLMs.txt Composer is an introduction. It helps WordPress site owners create a concise, accurate guide to their work for compatible AI agents. Write your own description, feature the pages that matter, and let WordPress keep new publications discoverable. No external AI account and no loss of editorial control.
 
 **Feature labels**
 - Content that stays yours

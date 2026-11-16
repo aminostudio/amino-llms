@@ -1,4 +1,4 @@
-=== Amino LLMS ===
+=== LLMs.txt Composer ===
 Contributors: aminostudio
 Tags: llms-txt, markdown, ai, content
 Requires at least: 6.4
@@ -12,7 +12,7 @@ A clear, human-guided llms.txt for WordPress. Automatic, Manual and Hybrid modes
 
 == Description ==
 
-**Amino LLMS** creates a simple Markdown guide at **/llms.txt** so compatible AI agents and researchers can navigate the most relevant parts of your site.
+**LLMs.txt Composer** creates a simple Markdown guide at **/llms.txt** so compatible AI agents and researchers can navigate the most relevant parts of your site.
 
 * **Automatic:** generate a short site introduction and updated public links from WordPress.
 * **Manual:** write and maintain your own complete Markdown document.
@@ -32,9 +32,9 @@ The llms.txt format is a discovery convention. It does not guarantee model inges
 
 == Installation ==
 
-1. Upload the **amino-llms** folder to /wp-content/plugins/ (or install the ZIP in Plugins > Add New > Upload Plugin).
-2. Activate **Amino LLMS**.
-3. Open **Settings > Amino LLMS**.
+1. Upload the **llms-txt-composer** folder to /wp-content/plugins/ (or install the ZIP in Plugins > Add New > Upload Plugin).
+2. Activate **LLMs.txt Composer**.
+3. Open **Settings > LLMs.txt Composer**.
 4. Choose Automatic, Manual, or Hybrid. Save your settings.
 5. Visit your site's /llms.txt and check the Markdown output.
 
@@ -60,11 +60,12 @@ Yes, publicly registered post types appear as options. The administrator control
 
 = Do I need Yoast SEO? =
 
-No. Amino LLMS is independent. Disable other llms.txt generators to avoid URL conflicts.
+No. LLMs.txt Composer is independent. Disable other llms.txt generators to avoid URL conflicts.
 
 == Changelog ==
 
 = 1.2.1 =
+* Renamed candidate identity: LLMs.txt Composer (new slug); existing 1.2.1 installations require migration from the prior slug.
 * Pagination past the first 100 WordPress results when filtering out noindex and protected content.
 * Markdown-safe URLs with parentheses encoded.
 * Permalink diagnostic in the WordPress settings screen.

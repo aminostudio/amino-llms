@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: Amino LLMS
+ * Plugin Name: LLMs.txt Composer
  * Plugin URI: https://github.com/aminostudio/amino-llms
  * Description: An editorial llms.txt for WordPress, with automatic, manual and hybrid modes.
  * Version: 1.2.1
@@ -10,7 +10,7 @@
  * Author URI: https://aminostudio.fr/
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: amino-llms
+ * Text Domain: llms-txt-composer
  */
 
 if (!defined('ABSPATH')) {
@@ -23,9 +23,9 @@ if (!defined('ABSPATH')) {
  */
 final class Amino_LLMS {
     private const VERSION = '1.2.1';
-    private const OPTION = 'amino_llms_settings';
-    private const PREVIOUS = 'amino_llms_previous_settings';
-    private const CACHE = 'amino_llms_document_cache';
+    private const OPTION = 'llms_txt_composer_settings';
+    private const PREVIOUS = 'llms_txt_composer_previous_settings';
+    private const CACHE = 'llms_txt_composer_document_cache';
     private const MAX_BYTES = 131072;
 
     public static function boot(): void {
@@ -50,6 +50,20 @@ final class Amino_LLMS {
     }
 
     public static function activate(): void {
+        // Copy settings once to a separate option namespace. The old plugin's
+        // uninstall.php deletes amino_llms_*; this new copy must survive it.
+        if (false === get_option(self::OPTION, false)) {
+            $legacy = get_option('amino_llms_settings', false);
+            if (is_array($legacy)) {
+                update_option(self::OPTION, $legacy, false);
+            }
+        }
+        if (false === get_option(self::PREVIOUS, false)) {
+            $legacy_previous = get_option('amino_llms_previous_settings', false);
+            if (is_array($legacy_previous)) {
+                update_option(self::PREVIOUS, $legacy_previous, false);
+            }
+        }
         self::add_route();
         flush_rewrite_rules(false);
         // Activation deliberately leaves every existing root llms.txt untouched.
@@ -332,23 +346,23 @@ final class Amino_LLMS {
     }
 
     public static function admin_menu(): void {
-        add_options_page('Amino LLMS', 'Amino LLMS', 'manage_options', 'amino-llms', [__CLASS__, 'admin_page']);
+        add_options_page('LLMs.txt Composer', 'LLMs.txt Composer', 'manage_options', 'llms-txt-composer', [__CLASS__, 'admin_page']);
     }
 
     public static function admin_assets(string $hook): void {
-        if ($hook === 'settings_page_amino-llms') {
-            wp_enqueue_style('amino-llms-admin', plugin_dir_url(__FILE__) . 'assets/admin.css', [], self::VERSION);
+        if ($hook === 'settings_page_llms-txt-composer') {
+            wp_enqueue_style('llms-txt-composer-admin', plugin_dir_url(__FILE__) . 'assets/admin.css', [], self::VERSION);
         }
     }
 
     private static function authorize(): void {
         if (!current_user_can('manage_options')) {
-            wp_die(esc_html__('You cannot manage these settings.', 'amino-llms'));
+            wp_die(esc_html__('You cannot manage these settings.', 'llms-txt-composer'));
         }
     }
 
     private static function redirect(string $notice): void {
-        wp_safe_redirect(add_query_arg('amino_llms_notice', $notice, admin_url('options-general.php?page=amino-llms')));
+        wp_safe_redirect(add_query_arg('amino_llms_notice', $notice, admin_url('options-general.php?page=llms-txt-composer')));
         exit;
     }
 
@@ -391,46 +405,46 @@ final class Amino_LLMS {
         $static_file = is_file($root_file);
         // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only status notice.
         $notice = isset($_GET['amino_llms_notice']) ? sanitize_key(wp_unslash($_GET['amino_llms_notice'])) : '';
-        echo '<div class="wrap amino-llms-admin"><div class="amino-llms-hero"><span class="amino-llms-kicker">AMINO / LLMS</span><h1>' . esc_html__('Your website, clearly understood.', 'amino-llms') . '</h1><p>' . esc_html__('Write an introduction that matters. Keep public content links up to date. No AI API, tracking or root file permissions.', 'amino-llms') . '</p></div>';
+        echo '<div class="wrap llms-txt-composer-admin"><div class="llms-txt-composer-hero"><span class="llms-txt-composer-kicker">AMINO / LLMS</span><h1>' . esc_html__('Your website, clearly understood.', 'llms-txt-composer') . '</h1><p>' . esc_html__('Write an introduction that matters. Keep public content links up to date. No AI API, tracking or root file permissions.', 'llms-txt-composer') . '</p></div>';
         if ($notice) {
             $okay = in_array($notice, ['saved', 'restored'], true);
             echo '<div class="notice notice-' . esc_attr($okay ? 'success' : 'error') . '"><p>' . esc_html($notice === 'invalid' ? 'A valid document needs a # heading and must be smaller than 128 KiB.' : ucfirst($notice)) . '</p></div>';
         }
         if ($static_file) {
-            echo '<div class="notice notice-warning"><p>' . esc_html__('An existing physical llms.txt was detected. Your web server may serve that file instead of the virtual document. Import its contents manually before renaming or removing it. This plugin never deletes or overwrites that file.', 'amino-llms') . '</p></div>';
+            echo '<div class="notice notice-warning"><p>' . esc_html__('An existing physical llms.txt was detected. Your web server may serve that file instead of the virtual document. Import its contents manually before renaming or removing it. This plugin never deletes or overwrites that file.', 'llms-txt-composer') . '</p></div>';
         }
         if ((string) get_option('permalink_structure', '') === '') {
-            echo '<div class="notice notice-warning"><p>' . esc_html__('Pretty permalinks appear to be disabled. A virtual /llms.txt depends on WordPress rewrite rules and may not resolve on this server. Enable permalinks and test the public URL.', 'amino-llms') . '</p></div>';
+            echo '<div class="notice notice-warning"><p>' . esc_html__('Pretty permalinks appear to be disabled. A virtual /llms.txt depends on WordPress rewrite rules and may not resolve on this server. Enable permalinks and test the public URL.', 'llms-txt-composer') . '</p></div>';
         }
-        echo '<div class="amino-llms-meta"><span>' . esc_html__('Delivery:', 'amino-llms') . ' <strong>' . esc_html__('Virtual /llms.txt', 'amino-llms') . '</strong></span><span>' . esc_html__('Mode:', 'amino-llms') . ' <strong>' . esc_html(ucfirst((string) $s['mode'])) . '</strong></span><span>v' . esc_html(self::VERSION) . '</span></div>';
-        echo '<div class="amino-llms-grid"><div class="amino-llms-panel"><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="amino_llms_save">';
+        echo '<div class="llms-txt-composer-meta"><span>' . esc_html__('Delivery:', 'llms-txt-composer') . ' <strong>' . esc_html__('Virtual /llms.txt', 'llms-txt-composer') . '</strong></span><span>' . esc_html__('Mode:', 'llms-txt-composer') . ' <strong>' . esc_html(ucfirst((string) $s['mode'])) . '</strong></span><span>v' . esc_html(self::VERSION) . '</span></div>';
+        echo '<div class="llms-txt-composer-grid"><div class="llms-txt-composer-panel"><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="amino_llms_save">';
         wp_nonce_field('amino_llms_save');
-        echo '<h2>' . esc_html__('Editorial settings', 'amino-llms') . '</h2><p><label for="al-mode"><strong>' . esc_html__('Document mode', 'amino-llms') . '</strong></label><select class="widefat" id="al-mode" name="amino_llms[mode]">';
+        echo '<h2>' . esc_html__('Editorial settings', 'llms-txt-composer') . '</h2><p><label for="al-mode"><strong>' . esc_html__('Document mode', 'llms-txt-composer') . '</strong></label><select class="widefat" id="al-mode" name="amino_llms[mode]">';
         foreach (['hybrid' => 'Hybrid: authored identity + current links', 'automatic' => 'Automatic: public WordPress content', 'manual' => 'Manual: your own Markdown'] as $key => $label) {
             echo '<option value="' . esc_attr($key) . '" ' . selected($s['mode'], $key, false) . '>' . esc_html($label) . '</option>';
         }
-        echo '</select></p><p><label for="al-name"><strong>' . esc_html__('Site name', 'amino-llms') . '</strong></label><input id="al-name" class="widefat" name="amino_llms[site_name]" maxlength="160" value="' . esc_attr((string) $s['site_name']) . '"></p>';
-        echo '<p><label for="al-summary"><strong>' . esc_html__('Short description', 'amino-llms') . '</strong></label><textarea class="widefat" rows="3" id="al-summary" name="amino_llms[summary]">' . esc_textarea((string) $s['summary']) . '</textarea></p>';
-        echo '<p><label for="al-intro"><strong>' . esc_html__('Editorial introduction (Hybrid)', 'amino-llms') . '</strong></label><textarea class="widefat" rows="5" id="al-intro" name="amino_llms[introduction]">' . esc_textarea((string) $s['introduction']) . '</textarea></p>';
-        echo '<p><label for="al-manual"><strong>' . esc_html__('Complete Markdown (Manual)', 'amino-llms') . '</strong></label><textarea class="widefat amino-llms-mono" rows="6" id="al-manual" name="amino_llms[manual_markdown]">' . esc_textarea((string) $s['manual_markdown']) . '</textarea></p>';
-        echo '<fieldset><legend><strong>' . esc_html__('Include public content types', 'amino-llms') . '</strong></legend>';
+        echo '</select></p><p><label for="al-name"><strong>' . esc_html__('Site name', 'llms-txt-composer') . '</strong></label><input id="al-name" class="widefat" name="amino_llms[site_name]" maxlength="160" value="' . esc_attr((string) $s['site_name']) . '"></p>';
+        echo '<p><label for="al-summary"><strong>' . esc_html__('Short description', 'llms-txt-composer') . '</strong></label><textarea class="widefat" rows="3" id="al-summary" name="amino_llms[summary]">' . esc_textarea((string) $s['summary']) . '</textarea></p>';
+        echo '<p><label for="al-intro"><strong>' . esc_html__('Editorial introduction (Hybrid)', 'llms-txt-composer') . '</strong></label><textarea class="widefat" rows="5" id="al-intro" name="amino_llms[introduction]">' . esc_textarea((string) $s['introduction']) . '</textarea></p>';
+        echo '<p><label for="al-manual"><strong>' . esc_html__('Complete Markdown (Manual)', 'llms-txt-composer') . '</strong></label><textarea class="widefat llms-txt-composer-mono" rows="6" id="al-manual" name="amino_llms[manual_markdown]">' . esc_textarea((string) $s['manual_markdown']) . '</textarea></p>';
+        echo '<fieldset><legend><strong>' . esc_html__('Include public content types', 'llms-txt-composer') . '</strong></legend>';
         foreach (self::public_types() as $type) {
-            echo '<label class="amino-llms-choice"><input type="checkbox" name="amino_llms[post_types][]" value="' . esc_attr($type->name) . '" ' . checked(in_array($type->name, $s['post_types'], true), true, false) . '> ' . esc_html($type->labels->name) . '</label>';
+            echo '<label class="llms-txt-composer-choice"><input type="checkbox" name="amino_llms[post_types][]" value="' . esc_attr($type->name) . '" ' . checked(in_array($type->name, $s['post_types'], true), true, false) . '> ' . esc_html($type->labels->name) . '</label>';
         }
-        echo '</fieldset><p><label for="al-count"><strong>' . esc_html__('Links per content type', 'amino-llms') . '</strong></label><input type="number" class="small-text" min="1" max="25" id="al-count" name="amino_llms[items_per_type]" value="' . esc_attr((string) $s['items_per_type']) . '"></p>';
-        echo '<p><label for="al-high"><strong>' . esc_html__('Featured post IDs', 'amino-llms') . '</strong> ' . esc_html__('(comma-separated; optional)', 'amino-llms') . '</label><input class="widefat" id="al-high" name="amino_llms[highlight_ids]" value="' . esc_attr((string) $s['highlight_ids']) . '"></p>';
-        submit_button(__('Save and update llms.txt', 'amino-llms'));
+        echo '</fieldset><p><label for="al-count"><strong>' . esc_html__('Links per content type', 'llms-txt-composer') . '</strong></label><input type="number" class="small-text" min="1" max="25" id="al-count" name="amino_llms[items_per_type]" value="' . esc_attr((string) $s['items_per_type']) . '"></p>';
+        echo '<p><label for="al-high"><strong>' . esc_html__('Featured post IDs', 'llms-txt-composer') . '</strong> ' . esc_html__('(comma-separated; optional)', 'llms-txt-composer') . '</label><input class="widefat" id="al-high" name="amino_llms[highlight_ids]" value="' . esc_attr((string) $s['highlight_ids']) . '"></p>';
+        submit_button(__('Save and update llms.txt', 'llms-txt-composer'));
         echo '</form>';
         if (is_array(get_option(self::PREVIOUS, null))) {
             echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="amino_llms_restore">';
             wp_nonce_field('amino_llms_restore');
-            submit_button(__('Restore previous settings', 'amino-llms'), 'secondary', 'submit', false);
+            submit_button(__('Restore previous settings', 'llms-txt-composer'), 'secondary', 'submit', false);
             echo '</form>';
         }
-        echo '</div><div class="amino-llms-panel"><h2>' . esc_html__('Markdown preview', 'amino-llms') . '</h2><p>' . esc_html__('Preview of your last saved settings. Save changes to update the public endpoint.', 'amino-llms') . '</p>';
-        echo '<textarea class="widefat amino-llms-mono" rows="24" readonly aria-label="' . esc_attr__('Markdown preview', 'amino-llms') . '">' . esc_textarea($preview) . '</textarea>';
-        echo '<p class="description">' . esc_html(number_format_i18n(strlen($preview))) . ' bytes · <a href="' . esc_url(home_url('/llms.txt')) . '" target="_blank" rel="noopener noreferrer">' . esc_html__('View public llms.txt', 'amino-llms') . '</a></p>';
-        echo '<p class="description">' . esc_html__('llms.txt is a discovery format, not a guarantee of AI indexing or citations.', 'amino-llms') . '</p></div></div></div>';
+        echo '</div><div class="llms-txt-composer-panel"><h2>' . esc_html__('Markdown preview', 'llms-txt-composer') . '</h2><p>' . esc_html__('Preview of your last saved settings. Save changes to update the public endpoint.', 'llms-txt-composer') . '</p>';
+        echo '<textarea class="widefat llms-txt-composer-mono" rows="24" readonly aria-label="' . esc_attr__('Markdown preview', 'llms-txt-composer') . '">' . esc_textarea($preview) . '</textarea>';
+        echo '<p class="description">' . esc_html(number_format_i18n(strlen($preview))) . ' bytes · <a href="' . esc_url(home_url('/llms.txt')) . '" target="_blank" rel="noopener noreferrer">' . esc_html__('View public llms.txt', 'llms-txt-composer') . '</a></p>';
+        echo '<p class="description">' . esc_html__('llms.txt is a discovery format, not a guarantee of AI indexing or citations.', 'llms-txt-composer') . '</p></div></div></div>';
     }
 }
 
