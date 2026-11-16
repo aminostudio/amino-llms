@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: LLMs.txt Composer
- * Plugin URI: https://github.com/aminostudio/amino-llms
+ * Plugin URI: https://github.com/aminostudio/llms-txt-composer
  * Description: An editorial llms.txt for WordPress, with automatic, manual and hybrid modes.
  * Version: 1.2.1
  * Requires at least: 6.4
