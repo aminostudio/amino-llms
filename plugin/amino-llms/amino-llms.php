@@ -292,6 +292,7 @@ final class Amino_LLMS {
 
     public static function valid_document(string $document): bool {
         return $document !== '' && strlen($document) <= self::MAX_BYTES &&
+            strpos($document, "\0") === false && preg_match('//u', $document) === 1 &&
             preg_match('/\A#[ \t]+\S/u', $document) === 1;
     }
 
