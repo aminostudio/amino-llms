@@ -31,6 +31,8 @@ jobs:
             exit 1
           fi
           echo "Linted $count tracked PHP files with PHP ${{ matrix.php }}"
+      - name: WordPress.org metadata consistency
+        run: php tests/release-metadata.php
       - name: Legacy tests
         run: php tests/run.php
       - name: Portable engine tests
