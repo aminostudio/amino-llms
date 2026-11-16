@@ -28,7 +28,7 @@ LLMs.txt Composer is an independent, lightweight WordPress plugin for publishing
 Installable ZIPs are built by [GitHub Actions](.github/workflows/package.yml) and published on [GitHub Releases](https://github.com/aminostudio/amino-llms/releases), rather than requiring users to ZIP the entire repository.
 
 ```bash
-php -l plugin/llms-txt-composer/amino-llms.php
+php -l plugin/llms-txt-composer/llms-txt-composer.php
 php tests/portable.php
 ```
 
