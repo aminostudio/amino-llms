@@ -105,6 +105,9 @@ unset($GLOBALS['query']['amino_llms_document']);
 check($GLOBALS['flushed'] === 1, 'Activation flushes rewrite rules');
 check($GLOBALS['routes'][0]['rule'] === '^llms\.txt/?$', 'Registered virtual llms.txt route');
 check(!file_exists($root . 'llms.txt'), 'Activation creates no root file');
+$admin_css = file_get_contents(dirname(__DIR__) . '/plugin/llms-txt-composer/assets/admin.css');
+check(is_string($admin_css) && str_contains($admin_css, '.llms-txt-composer-admin'), 'Renamed admin stylesheet matches the plugin HTML');
+check(!str_contains($admin_css, '.amino-llms-'), 'Old admin CSS selectors do not survive public rename');
 check(in_array('amino_llms_document', Amino_LLMS::query_vars([]), true), 'Public endpoint query var available');
 
 $defaults = Amino_LLMS::defaults();
