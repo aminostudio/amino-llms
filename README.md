@@ -4,7 +4,7 @@
 
 **Your website, clearly understood.**
 
-**v1.2.1** improves discovery beyond excluded items, Markdown link encoding and rewrite diagnostics.
+**v1.3.0-beta.1** adds an administrator-only title search to select featured public content, while retaining the hardened Markdown output from v1.2.1. This is a LAB validation candidate, not a public stable release.
 
 LLMs.txt Composer is an independent, lightweight WordPress plugin for publishing a human-guided `llms.txt` in Markdown. **Automatic, Manual, and Hybrid** modes let site owners explain what matters rather than dumping a complete XML sitemap.
 

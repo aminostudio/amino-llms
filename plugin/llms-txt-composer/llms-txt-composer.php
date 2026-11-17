@@ -3,7 +3,7 @@
  * Plugin Name: LLMs.txt Composer
  * Plugin URI: https://github.com/aminostudio/llms-txt-composer
  * Description: An editorial llms.txt for WordPress, with automatic, manual and hybrid modes.
- * Version: 1.2.1
+ * Version: 1.3.0-beta.1
  * Requires at least: 6.4
  * Requires PHP: 8.0
  * Author: Amino Studio
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
  * Legacy site-specific v1.1 lives in a different directory and is not modified.
  */
 final class Amino_LLMS {
-    private const VERSION = '1.2.1';
+    private const VERSION = '1.3.0-beta.1';
     private const OPTION = 'llms_txt_composer_settings';
     private const PREVIOUS = 'llms_txt_composer_previous_settings';
     private const CACHE = 'llms_txt_composer_document_cache';
