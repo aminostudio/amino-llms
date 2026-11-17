@@ -47,6 +47,8 @@ final class Amino_LLMS {
         add_action('deleted_post_meta', [__CLASS__, 'invalidate']);
         add_action('update_option_blogname', [__CLASS__, 'invalidate']);
         add_action('update_option_blogdescription', [__CLASS__, 'invalidate']);
+        // The generated Home and permalink links depend on the site's public URL.
+        add_action('update_option_home', [__CLASS__, 'invalidate']);
     }
 
     public static function activate(): void {
