@@ -67,3 +67,6 @@ jobs:
           curl -fsS http://localhost:8880/llms.txt -o /tmp/amino-admin-restore.txt
           grep -q 'editorial introduction' /tmp/amino-admin-restore.txt
           echo "Real admin save/restore handlers passed."
+          # Verify the new featured search against an actual WordPress database.
+          wp-env run cli wp eval '$id = wp_insert_post(["post_title" => "Composer Featured Lookup Fixture", "post_type" => "post", "post_status" => "publish"], true); if (is_wp_error($id) || !$id) { WP_CLI::error("Could not seed public search fixture"); } $rows = Amino_LLMS::find_featured_posts("Composer Featured Lookup Fixture"); if (count($rows) !== 1 || $rows[0]["id"] !== $id) { WP_CLI::error("Published content search failed"); } update_post_meta($id, "_yoast_wpseo_meta-robots-noindex", "1"); if (Amino_LLMS::find_featured_posts("Composer Featured Lookup Fixture")) { WP_CLI::error("Noindex content leaked into search"); } delete_post_meta($id, "_yoast_wpseo_meta-robots-noindex"); wp_update_post(["ID" => $id, "post_status" => "private"]); if (Amino_LLMS::find_featured_posts("Composer Featured Lookup Fixture")) { WP_CLI::error("Private content leaked into search"); } wp_delete_post($id, true); WP_CLI::success("Real WordPress featured search and privacy verified");'
+
