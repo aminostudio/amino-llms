@@ -165,6 +165,10 @@ $GLOBALS['posts'] = array_values(array_filter($GLOBALS['posts'], static fn($p) =
 
 check(Amino_LLMS::valid_document($doc), 'Generated Markdown valid');
 check(!Amino_LLMS::valid_document('This is not Markdown with a title'), 'Document without top heading rejected');
+check(!Amino_LLMS::valid_document("Unexpected preface\n# Later heading"), 'Heading later in document cannot satisfy top heading requirement');
+check(Amino_LLMS::valid_document("# Valid heading\n\n## Section\nContent"), 'First-line heading and later sections are accepted');
+check(!Amino_LLMS::valid_document("# Title\n" . chr(0) . "hidden"), 'NUL byte rejected in public document');
+check(!Amino_LLMS::valid_document("# Title\n" . chr(255)), 'Invalid UTF-8 rejected in public document');
 check(!Amino_LLMS::valid_document('# Title' . str_repeat('x', 140000)), 'Oversized document rejected');
 
 update_option('amino_llms_settings', $hybrid);
