@@ -405,7 +405,7 @@ final class Amino_LLMS {
         $static_file = is_file($root_file);
         // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only status notice.
         $notice = isset($_GET['amino_llms_notice']) ? sanitize_key(wp_unslash($_GET['amino_llms_notice'])) : '';
-        echo '<div class="wrap llms-txt-composer-admin"><div class="llms-txt-composer-hero"><span class="llms-txt-composer-kicker">AMINO / LLMS</span><h1>' . esc_html__('Your website, clearly understood.', 'llms-txt-composer') . '</h1><p>' . esc_html__('Write an introduction that matters. Keep public content links up to date. No AI API, tracking or root file permissions.', 'llms-txt-composer') . '</p></div>';
+        echo '<div class="wrap llms-txt-composer-admin"><div class="llms-txt-composer-hero"><span class="llms-txt-composer-kicker">LLMS.TXT / COMPOSER</span><h1>' . esc_html__('Your website, clearly understood.', 'llms-txt-composer') . '</h1><p>' . esc_html__('Write an introduction that matters. Keep public content links up to date. No AI API, tracking or root file permissions.', 'llms-txt-composer') . '</p></div>';
         if ($notice) {
             $okay = in_array($notice, ['saved', 'restored'], true);
             echo '<div class="notice notice-' . esc_attr($okay ? 'success' : 'error') . '"><p>' . esc_html($notice === 'invalid' ? 'A valid document needs a # heading and must be smaller than 128 KiB.' : ucfirst($notice)) . '</p></div>';

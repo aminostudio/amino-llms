@@ -44,6 +44,9 @@ $failures = [];
 if ('LLMs.txt Composer' !== $plugin_name) {
     $failures[] = 'Unexpected WordPress plugin display name.';
 }
+if (!str_contains($plugin, 'LLMS.TXT / COMPOSER')) {
+    $failures[] = 'Public admin brand identity is outdated.';
+}
 if (!preg_match('/^[0-9]+\.[0-9]+\.[0-9]+(?:[-.][a-zA-Z0-9.-]+)?$/', $plugin_version)) {
     $failures[] = 'Missing or malformed plugin Version header.';
 }
