@@ -17,12 +17,20 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: none
-      - name: PHP syntax (legacy)
-        run: php -l plugin/amino-llms-dynamic/amino-llms-dynamic.php
-      - name: PHP syntax (portable beta)
-        run: php -l plugin/amino-llms/amino-llms.php
-      - name: PHP syntax (tests)
-        run: php -l tests/run.php && php -l tests/portable.php
+      - name: PHP syntax (all tracked PHP sources and tests)
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=0
+          while IFS= read -r -d '' file; do
+            php -l "$file"
+            count=$((count + 1))
+          done < <(git ls-files -z '*.php')
+          if [ "$count" -eq 0 ]; then
+            echo "No tracked PHP files found" >&2
+            exit 1
+          fi
+          echo "Linted $count tracked PHP files with PHP ${{ matrix.php }}"
       - name: Legacy tests
         run: php tests/run.php
       - name: Portable engine tests
