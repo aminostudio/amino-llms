@@ -521,6 +521,7 @@ final class Amino_LLMS {
                 continue;
             }
             $label = (string) get_the_title($featured_post);
+            // translators: %s: title of the published post or page removed from featured items.
             echo '<li data-featured-id="' . esc_attr((string) $featured_post->ID) . '"><span>' . esc_html($label) . '</span> <button type="button" data-featured-remove class="button-link" aria-label="' . esc_attr(sprintf(__('Remove %s', 'llms-txt-composer'), $label)) . '">' . esc_html__('Remove', 'llms-txt-composer') . '</button></li>';
         }
         echo '</ul><details class="llms-txt-composer-advanced"><summary>' . esc_html__('Advanced: edit post IDs manually', 'llms-txt-composer') . '</summary>';
