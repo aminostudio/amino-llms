@@ -1,4 +1,4 @@
-# Roadmap · Amino LLMS
+# Roadmap · LLMs.txt Composer
 
 ## RC priority: distribute the essentials
 

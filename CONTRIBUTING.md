@@ -1,6 +1,6 @@
-# Contributing to Amino LLMS
+# Contributing to LLMs.txt Composer
 
-Amino LLMS is being developed into a general-purpose WordPress plugin. The current source is a site-specific proof of concept: please read [ROADMAP.md](ROADMAP.md) before implementing broad features.
+LLMs.txt Composer is being developed into a general-purpose WordPress plugin. The current source is a site-specific proof of concept: please read [ROADMAP.md](ROADMAP.md) before implementing broad features.
 
 For each change, describe the motivation, affected WordPress versions and compatibility implications. Add focused tests for document preservation, activation, generation, permissions, post visibility, malformed Markdown markers and upgrade paths.
 

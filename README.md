@@ -1,12 +1,12 @@
-# Amino LLMS
+# LLMs.txt Composer
 
-![Amino LLMS](assets/brand-mark.svg)
+![LLMs.txt Composer](assets/brand-mark.svg)
 
 **Your website, clearly understood.**
 
 **v1.2.1** improves discovery beyond excluded items, Markdown link encoding and rewrite diagnostics.
 
-Amino LLMS is an independent, lightweight WordPress plugin for publishing a human-guided `llms.txt` in Markdown. **Automatic, Manual, and Hybrid** modes let site owners explain what matters rather than dumping a complete XML sitemap.
+LLMs.txt Composer is an independent, lightweight WordPress plugin for publishing a human-guided `llms.txt` in Markdown. **Automatic, Manual, and Hybrid** modes let site owners explain what matters rather than dumping a complete XML sitemap.
 
 **No external AI service. No telemetry. No server-root file writes.**
 
@@ -28,11 +28,15 @@ Amino LLMS is an independent, lightweight WordPress plugin for publishing a huma
 Installable ZIPs are built by [GitHub Actions](.github/workflows/package.yml) and published on [GitHub Releases](https://github.com/aminostudio/amino-llms/releases), rather than requiring users to ZIP the entire repository.
 
 ```bash
-php -l plugin/amino-llms/amino-llms.php
+php -l plugin/llms-txt-composer/llms-txt-composer.php
 php tests/portable.php
 ```
 
 CI also runs WordPress Plugin Check and an HTTP smoke test against a disposable WordPress instance. See [ROADMAP.md](ROADMAP.md) for remaining work and [SECURITY.md](SECURITY.md) for reporting.
+
+### Rename and safe migration from Amino LLMS 1.2.1
+
+The WordPress.org candidate has a new plugin slug: `llms-txt-composer`. It is a **separate plugin** from `amino-llms`, not an in-place WordPress update. Deactivate the old portable plugin, keep its files installed temporarily, install and activate the new candidate, then verify Settings and `/llms.txt`. The new plugin **copies** legacy options on first activation into `llms_txt_composer_*` and does not erase them. Only after checking that settings survived, remove the old plugin through WordPress. Removing the old plugin first runs its uninstall cleanup, destroying the settings before they can be migrated.
 
 ### Migration from Amino Studio 1.1
 
@@ -46,7 +50,7 @@ An `llms.txt` is a [community-proposed discovery format](https://llmstxt.org/). 
 
 ## Repository
 
-- `plugin/amino-llms/`: **distributable WordPress plugin**.
+- `plugin/llms-txt-composer/`: **distributable WordPress plugin**.
 - `plugin/amino-llms-dynamic/`: archived Amino Studio 1.1 site-specific reference.
 - `tests/`: mock-based regression suites.
 - `.github/workflows/`: PHP matrix, Plugin Check, runtime and installable ZIP build.

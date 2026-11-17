@@ -85,7 +85,7 @@ function sanitize_textarea_field($value): string {return trim(strip_tags((string
 function wp_check_invalid_utf8($text, $strip = false): string {return (string) $text;}
 function absint($v): int {return abs((int) $v);}
 function trailingslashit($value): string {return rtrim($value, '/') . '/';}
-require dirname(__DIR__) . '/plugin/amino-llms/amino-llms.php';
+require dirname(__DIR__) . '/plugin/llms-txt-composer/llms-txt-composer.php';
 
 $checks = 0;
 function check(bool $condition, string $message): void {
@@ -93,13 +93,21 @@ function check(bool $condition, string $message): void {
     if (!$condition) throw new RuntimeException('FAIL: ' . $message);
     echo 'PASS ' . (++$checks) . ': ' . $message . PHP_EOL;
 }
+$GLOBALS['options']['amino_llms_settings'] = ['mode' => 'manual', 'manual_markdown' => '# Old configuration'];
+$GLOBALS['options']['amino_llms_previous_settings'] = ['mode' => 'hybrid', 'introduction' => 'Previously saved'];
 Amino_LLMS::activate();
+check(get_option('llms_txt_composer_settings')['mode'] === 'manual', 'Legacy settings migrated to isolated composer option');
+check(get_option('llms_txt_composer_previous_settings')['introduction'] === 'Previously saved', 'Previous settings snapshot migrated');
+check(get_option('amino_llms_settings')['mode'] === 'manual', 'Legacy configuration preserved for old plugin');
 $GLOBALS['query']['amino_llms_document']='1';
 check(Amino_LLMS::skip_canonical('https://example.test/llms.txt/','https://example.test/llms.txt') === false, 'Canonical redirects disabled for virtual document');
 unset($GLOBALS['query']['amino_llms_document']);
 check($GLOBALS['flushed'] === 1, 'Activation flushes rewrite rules');
 check($GLOBALS['routes'][0]['rule'] === '^llms\.txt/?$', 'Registered virtual llms.txt route');
 check(!file_exists($root . 'llms.txt'), 'Activation creates no root file');
+$admin_css = file_get_contents(dirname(__DIR__) . '/plugin/llms-txt-composer/assets/admin.css');
+check(is_string($admin_css) && str_contains($admin_css, '.llms-txt-composer-admin'), 'Renamed admin stylesheet matches the plugin HTML');
+check(!str_contains($admin_css, '.amino-llms-'), 'Old admin CSS selectors do not survive public rename');
 check(in_array('amino_llms_document', Amino_LLMS::query_vars([]), true), 'Public endpoint query var available');
 
 $defaults = Amino_LLMS::defaults();
@@ -171,12 +179,12 @@ check(!Amino_LLMS::valid_document("# Title\n" . chr(0) . "hidden"), 'NUL byte re
 check(!Amino_LLMS::valid_document("# Title\n" . chr(255)), 'Invalid UTF-8 rejected in public document');
 check(!Amino_LLMS::valid_document('# Title' . str_repeat('x', 140000)), 'Oversized document rejected');
 
-update_option('amino_llms_settings', $hybrid);
+update_option('llms_txt_composer_settings', $hybrid);
 $first = Amino_LLMS::current_document();
 check($first === $doc, 'Public document generated from settings');
-check($GLOBALS['transients']['amino_llms_document_cache'] === $doc, 'Document cached');
+check($GLOBALS['transients']['llms_txt_composer_document_cache'] === $doc, 'Document cached');
 Amino_LLMS::invalidate();
-check(!isset($GLOBALS['transients']['amino_llms_document_cache']), 'Cache invalidated on edits');
+check(!isset($GLOBALS['transients']['llms_txt_composer_document_cache']), 'Cache invalidated on edits');
 $automatic = $hybrid;
 $automatic['mode'] = 'automatic';
 check(!str_contains(Amino_LLMS::render($automatic), 'Our editorial note.'), 'Automatic mode omits hybrid introduction');
