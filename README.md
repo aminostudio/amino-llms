@@ -15,7 +15,7 @@ LLMs.txt Composer is an independent, lightweight WordPress plugin for publishing
 - Automatic mode: site identity and links to recently published public content.
 - Manual mode: complete Markdown authoring in the WordPress admin.
 - Hybrid mode: editorial introduction plus automatically generated links.
-- Select public WordPress post types, a link limit and featured post IDs.
+- Select public WordPress post types and a link limit; search published content by title to add featured links (up to 10). The manual ID field remains available as an advanced fallback.
 - Markdown preview and a one-step restore of prior settings.
 - Filter private, draft, password-protected and common noindex content.
 - Serve **/llms.txt** through WordPress rewrite, with short-lived caching and cache invalidation after content updates.

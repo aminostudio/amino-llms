@@ -19,6 +19,8 @@ jobs:
           test -s plugin/llms-txt-composer/readme.txt
           test -s plugin/llms-txt-composer/uninstall.php
           test -s plugin/llms-txt-composer/assets/admin.css
+          test -s plugin/llms-txt-composer/assets/admin.js
+          node --check plugin/llms-txt-composer/assets/admin.js
           test -f LICENSE
       - name: Build minimal installable plugin archive
         shell: bash
