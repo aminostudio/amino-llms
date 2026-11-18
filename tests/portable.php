@@ -69,7 +69,11 @@ function get_post_type_object($name): ?object {return $GLOBALS['types'][$name] ?
 function get_post($id): ?WP_Post {foreach ($GLOBALS['posts'] as $post) {if ($post->ID === $id) return $post;}return null;}
 function get_post_meta($id, $key, $single = true): mixed {return $GLOBALS['post_meta'][$id][$key] ?? '';}
 function get_posts($args): array {
-    $items = array_filter($GLOBALS['posts'], fn($post) => $post->post_type === $args['post_type'] && $post->post_status === 'publish');
+    $items = array_filter($GLOBALS['posts'], fn($post) =>
+        in_array($post->post_type, (array) $args['post_type'], true) &&
+        $post->post_status === 'publish' &&
+        (empty($args['s']) || stripos($post->post_title, (string) $args['s']) !== false)
+    );
     usort($items, fn($a, $b) => strcmp($b->post_date, $a->post_date));
     return array_slice($items, $args['offset'] ?? 0, $args['posts_per_page'] ?? 6);
 }
@@ -86,6 +90,12 @@ function sanitize_textarea_field($value): string {return trim(strip_tags((string
 function wp_check_invalid_utf8($text, $strip = false): string {return (string) $text;}
 function absint($v): int {return abs((int) $v);}
 function trailingslashit($value): string {return rtrim($value, '/') . '/';}
+function current_user_can($cap): bool {return $GLOBALS['ajax_admin'] ?? false;}
+function check_ajax_referer($action, $query_arg, $die = true) {return ($GLOBALS['ajax_nonce_valid'] ?? false) ? 1 : false;}
+function wp_unslash($value) {return $value;}
+function wp_send_json_success($data): void {$GLOBALS['ajax_result'] = ['success' => true, 'data' => $data];}
+function wp_send_json_error($data, $code = 400): void {$GLOBALS['ajax_result'] = ['success' => false, 'data' => $data, 'code' => $code];}
+
 require dirname(__DIR__) . '/plugin/llms-txt-composer/llms-txt-composer.php';
 
 $checks = 0;
@@ -114,6 +124,32 @@ check(in_array('amino_llms_document', Amino_LLMS::query_vars([]), true), 'Public
 $defaults = Amino_LLMS::defaults();
 check($defaults['mode'] === 'hybrid', 'Hybrid is the default');
 check($defaults['post_types'] === ['page', 'post'], 'Pages and posts are included by default');
+
+$matches = Amino_LLMS::find_featured_posts('technology');
+check(count($matches) === 1 && $matches[0]['id'] === 7 && $matches[0]['type'] === 'Books', 'Editor search finds public CPT by title');
+check([] === Amino_LLMS::find_featured_posts('Yoast hidden'), 'Editor search hides Yoast noindex entries');
+check([] === Amino_LLMS::find_featured_posts('Rank Math hidden'), 'Editor search hides Rank Math noindex entries');
+check([] === Amino_LLMS::find_featured_posts('Password story'), 'Editor search hides password-protected entries');
+check([] === Amino_LLMS::find_featured_posts('Private story'), 'Editor search hides private entries');
+check([] === Amino_LLMS::find_featured_posts('Home page'), 'Editor search skips front page duplicated by generator');
+check([] === Amino_LLMS::find_featured_posts('a'), 'Editor search refuses single-character terms');
+$GLOBALS['ajax_admin'] = false;
+$GLOBALS['ajax_nonce_valid'] = true;
+$_GET['q'] = 'technology';
+Amino_LLMS::ajax_find_posts();
+check(!$GLOBALS['ajax_result']['success'] && $GLOBALS['ajax_result']['code'] === 403, 'AJAX rejects unauthorized users');
+$GLOBALS['ajax_admin'] = true;
+$GLOBALS['ajax_nonce_valid'] = false;
+Amino_LLMS::ajax_find_posts();
+check(!$GLOBALS['ajax_result']['success'] && $GLOBALS['ajax_result']['code'] === 403, 'AJAX rejects invalid nonce');
+$GLOBALS['ajax_nonce_valid'] = true;
+Amino_LLMS::ajax_find_posts();
+check($GLOBALS['ajax_result']['success'] && $GLOBALS['ajax_result']['data'][0]['id'] === 7, 'Authorized AJAX returns eligible published content');
+$_GET['q'] = ['unexpected' => 'array'];
+Amino_LLMS::ajax_find_posts();
+check($GLOBALS['ajax_result']['success'] && $GLOBALS['ajax_result']['data'] === [], 'AJAX safely handles malformed search input');
+unset($_GET['q']);
+
 
 $clean = Amino_LLMS::clean_settings([
     'mode' => 'manual',

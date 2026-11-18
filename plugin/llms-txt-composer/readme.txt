@@ -4,7 +4,7 @@ Tags: llms-txt, markdown, ai, content
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.2.1
+Stable tag: 1.3.0-beta.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -63,6 +63,12 @@ Yes, publicly registered post types appear as options. The administrator control
 No. LLMs.txt Composer is independent. Disable other llms.txt generators to avoid URL conflicts.
 
 == Changelog ==
+
+= 1.3.0-beta.1 =
+* Added a title-based highlight selector for published posts, pages and public content types.
+* Protected featured-content search with an administrator capability check and WordPress nonce.
+* Preserved the existing advanced post ID field and settings rollback workflow.
+* Beta test candidate only; not yet approved for WordPress.org distribution.
 
 = 1.2.1 =
 * Renamed candidate identity: LLMs.txt Composer (new slug); existing 1.2.1 installations require migration from the prior slug.

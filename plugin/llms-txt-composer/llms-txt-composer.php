@@ -3,7 +3,7 @@
  * Plugin Name: LLMs.txt Composer
  * Plugin URI: https://github.com/aminostudio/llms-txt-composer
  * Description: An editorial llms.txt for WordPress, with automatic, manual and hybrid modes.
- * Version: 1.2.1
+ * Version: 1.3.0-beta.1
  * Requires at least: 6.4
  * Requires PHP: 8.0
  * Author: Amino Studio
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
  * Legacy site-specific v1.1 lives in a different directory and is not modified.
  */
 final class Amino_LLMS {
-    private const VERSION = '1.2.1';
+    private const VERSION = '1.3.0-beta.1';
     private const OPTION = 'llms_txt_composer_settings';
     private const PREVIOUS = 'llms_txt_composer_previous_settings';
     private const CACHE = 'llms_txt_composer_document_cache';
@@ -37,6 +37,7 @@ final class Amino_LLMS {
         add_action('admin_enqueue_scripts', [__CLASS__, 'admin_assets']);
         add_action('admin_post_amino_llms_save', [__CLASS__, 'save_settings']);
         add_action('admin_post_amino_llms_restore', [__CLASS__, 'restore_settings']);
+        add_action('wp_ajax_amino_llms_find_posts', [__CLASS__, 'ajax_find_posts']);
         add_action('save_post', [__CLASS__, 'invalidate']);
         add_action('deleted_post', [__CLASS__, 'invalidate']);
         add_action('trashed_post', [__CLASS__, 'invalidate']);
@@ -354,7 +355,79 @@ final class Amino_LLMS {
     public static function admin_assets(string $hook): void {
         if ($hook === 'settings_page_llms-txt-composer') {
             wp_enqueue_style('llms-txt-composer-admin', plugin_dir_url(__FILE__) . 'assets/admin.css', [], self::VERSION);
+            wp_enqueue_script('llms-txt-composer-admin', plugin_dir_url(__FILE__) . 'assets/admin.js', [], self::VERSION, true);
+            wp_localize_script('llms-txt-composer-admin', 'llmsComposerSearch', [
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('amino_llms_featured_search'),
+                'searching' => __('Searching published content…', 'llms-txt-composer'),
+                'none' => __('No eligible public content found.', 'llms-txt-composer'),
+                'choose' => __('Select a result to feature it.', 'llms-txt-composer'),
+                'added' => __('Added. Save settings to publish your changes.', 'llms-txt-composer'),
+                'limit' => __('You can feature up to 10 items.', 'llms-txt-composer'),
+                'failed' => __('Search could not be completed. Try again.', 'llms-txt-composer'),
+                'remove' => __('Remove', 'llms-txt-composer'),
+                'min' => __('Enter at least two characters to search.', 'llms-txt-composer'),
+            ]);
         }
+    }
+
+    /**
+     * Search only eligible publicly published content. Results are capped and
+     * revalidated server-side rather than trusting client-selected IDs.
+     */
+    public static function find_featured_posts(string $query): array {
+        $query = trim(self::limit(sanitize_text_field($query), 80));
+        if (strlen($query) < 2) {
+            return [];
+        }
+        $types = self::public_types();
+        if (!$types) {
+            return [];
+        }
+        $posts = get_posts([
+            'post_type' => array_keys($types),
+            'post_status' => 'publish',
+            's' => $query,
+            'posts_per_page' => 60,
+            'orderby' => 'relevance',
+            'no_found_rows' => true,
+            'ignore_sticky_posts' => true,
+            'suppress_filters' => false,
+        ]);
+        $results = [];
+        $home_id = absint(get_option('page_on_front', 0));
+        foreach ($posts as $post) {
+            if (!($post instanceof WP_Post) || $post->ID === $home_id || !self::allowed_post($post)) {
+                continue;
+            }
+            if (self::link($post) === '') {
+                continue;
+            }
+            $results[] = [
+                'id' => (int) $post->ID,
+                'title' => self::limit(wp_strip_all_tags((string) get_the_title($post)), 160),
+                'type' => (string) $types[$post->post_type]->labels->name,
+            ];
+            if (count($results) === 10) {
+                break;
+            }
+        }
+        return $results;
+    }
+
+    /** Admin-only AJAX lookup; never disclose drafts, protected or noindex posts. */
+    public static function ajax_find_posts(): void {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'Forbidden'], 403);
+            return;
+        }
+        if (false === check_ajax_referer('amino_llms_featured_search', 'nonce', false)) {
+            wp_send_json_error(['message' => 'Invalid nonce'], 403);
+            return;
+        }
+        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitized and length-limited in find_featured_posts().
+        $term = isset($_GET['q']) && is_string($_GET['q']) ? wp_unslash($_GET['q']) : '';
+        wp_send_json_success(self::find_featured_posts($term));
     }
 
     private static function authorize(): void {
@@ -434,7 +507,27 @@ final class Amino_LLMS {
             echo '<label class="llms-txt-composer-choice"><input type="checkbox" name="amino_llms[post_types][]" value="' . esc_attr($type->name) . '" ' . checked(in_array($type->name, $s['post_types'], true), true, false) . '> ' . esc_html($type->labels->name) . '</label>';
         }
         echo '</fieldset><p><label for="al-count"><strong>' . esc_html__('Links per content type', 'llms-txt-composer') . '</strong></label><input type="number" class="small-text" min="1" max="25" id="al-count" name="amino_llms[items_per_type]" value="' . esc_attr((string) $s['items_per_type']) . '"></p>';
-        echo '<p><label for="al-high"><strong>' . esc_html__('Featured post IDs', 'llms-txt-composer') . '</strong> ' . esc_html__('(comma-separated; optional)', 'llms-txt-composer') . '</label><input class="widefat" id="al-high" name="amino_llms[highlight_ids]" value="' . esc_attr((string) $s['highlight_ids']) . '"></p>';
+        echo '<div id="llms-composer-featured" class="llms-txt-composer-featured">';
+        echo '<p><label for="al-featured-search"><strong>' . esc_html__('Search content to highlight', 'llms-txt-composer') . '</strong></label>';
+        echo '<input class="widefat" type="search" id="al-featured-search" autocomplete="off" aria-controls="al-featured-results" aria-describedby="al-featured-status" placeholder="' . esc_attr__('Search posts, pages or public content types…', 'llms-txt-composer') . '"></p>';
+        echo '<p id="al-featured-status" role="status" aria-live="polite" class="description"></p>';
+        echo '<ul id="al-featured-results" class="llms-txt-composer-results"></ul>';
+        echo '<p><strong>' . esc_html__('Selected highlights', 'llms-txt-composer') . '</strong> <span class="description">' . esc_html__('(up to 10)', 'llms-txt-composer') . '</span></p>';
+        echo '<ul id="al-featured-selected" class="llms-txt-composer-selected">';
+        foreach (explode(',', (string) $s['highlight_ids']) as $value) {
+            if (!ctype_digit($value) || !(int) $value) {
+                continue;
+            }
+            $featured_post = get_post((int) $value);
+            if (!($featured_post instanceof WP_Post) || !self::allowed_post($featured_post)) {
+                continue;
+            }
+            $label = (string) get_the_title($featured_post);
+            // translators: %s: title of the published post or page removed from featured items.
+            echo '<li data-featured-id="' . esc_attr((string) $featured_post->ID) . '"><span>' . esc_html($label) . '</span> <button type="button" data-featured-remove class="button-link" aria-label="' . esc_attr(sprintf(__('Remove %s', 'llms-txt-composer'), $label)) . '">' . esc_html__('Remove', 'llms-txt-composer') . '</button></li>';
+        }
+        echo '</ul><details class="llms-txt-composer-advanced"><summary>' . esc_html__('Advanced: edit post IDs manually', 'llms-txt-composer') . '</summary>';
+        echo '<p><label for="al-high">' . esc_html__('Featured post IDs (comma-separated)', 'llms-txt-composer') . '</label><input class="widefat" id="al-high" name="amino_llms[highlight_ids]" value="' . esc_attr((string) $s['highlight_ids']) . '"></p></details></div>';
         submit_button(__('Save and update llms.txt', 'llms-txt-composer'));
         echo '</form>';
         if (is_array(get_option(self::PREVIOUS, null))) {
