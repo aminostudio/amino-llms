@@ -498,11 +498,11 @@ final class Amino_LLMS {
         foreach (['hybrid' => 'Hybrid: authored identity + current links', 'automatic' => 'Automatic: public WordPress content', 'manual' => 'Manual: your own Markdown'] as $key => $label) {
             echo '<option value="' . esc_attr($key) . '" ' . selected($s['mode'], $key, false) . '>' . esc_html($label) . '</option>';
         }
-        echo '</select></p><p><label for="al-name"><strong>' . esc_html__('Site name', 'llms-txt-composer') . '</strong></label><input id="al-name" class="widefat" name="amino_llms[site_name]" maxlength="160" value="' . esc_attr((string) $s['site_name']) . '"></p>';
-        echo '<p><label for="al-summary"><strong>' . esc_html__('Short description', 'llms-txt-composer') . '</strong></label><textarea class="widefat" rows="3" id="al-summary" name="amino_llms[summary]">' . esc_textarea((string) $s['summary']) . '</textarea></p>';
-        echo '<p><label for="al-intro"><strong>' . esc_html__('Editorial introduction (Hybrid)', 'llms-txt-composer') . '</strong></label><textarea class="widefat" rows="5" id="al-intro" name="amino_llms[introduction]">' . esc_textarea((string) $s['introduction']) . '</textarea></p>';
-        echo '<p><label for="al-manual"><strong>' . esc_html__('Complete Markdown (Manual)', 'llms-txt-composer') . '</strong></label><textarea class="widefat llms-txt-composer-mono" rows="6" id="al-manual" name="amino_llms[manual_markdown]">' . esc_textarea((string) $s['manual_markdown']) . '</textarea></p>';
-        echo '<fieldset><legend><strong>' . esc_html__('Include public content types', 'llms-txt-composer') . '</strong></legend>';
+        echo '</select></p><div data-mode-show="automatic hybrid"><p><label for="al-name"><strong>' . esc_html__('Site name', 'llms-txt-composer') . '</strong></label><input id="al-name" class="widefat" name="amino_llms[site_name]" maxlength="160" value="' . esc_attr((string) $s['site_name']) . '"></p>';
+        echo '<p><label for="al-summary"><strong>' . esc_html__('Short description', 'llms-txt-composer') . '</strong></label><textarea class="widefat" rows="3" id="al-summary" name="amino_llms[summary]">' . esc_textarea((string) $s['summary']) . '</textarea></p></div>';
+        echo '<div data-mode-show="hybrid"><p><label for="al-intro"><strong>' . esc_html__('Editorial introduction (Hybrid)', 'llms-txt-composer') . '</strong></label><textarea class="widefat" rows="5" id="al-intro" name="amino_llms[introduction]">' . esc_textarea((string) $s['introduction']) . '</textarea></p></div>';
+        echo '<div data-mode-show="manual"><p><label for="al-manual"><strong>' . esc_html__('Complete Markdown (Manual)', 'llms-txt-composer') . '</strong></label><textarea class="widefat llms-txt-composer-mono" rows="6" id="al-manual" name="amino_llms[manual_markdown]">' . esc_textarea((string) $s['manual_markdown']) . '</textarea></p></div>';
+        echo '<div data-mode-show="automatic hybrid"><fieldset><legend><strong>' . esc_html__('Include public content types', 'llms-txt-composer') . '</strong></legend>';
         foreach (self::public_types() as $type) {
             echo '<label class="llms-txt-composer-choice"><input type="checkbox" name="amino_llms[post_types][]" value="' . esc_attr($type->name) . '" ' . checked(in_array($type->name, $s['post_types'], true), true, false) . '> ' . esc_html($type->labels->name) . '</label>';
         }
@@ -527,7 +527,7 @@ final class Amino_LLMS {
             echo '<li data-featured-id="' . esc_attr((string) $featured_post->ID) . '"><span>' . esc_html($label) . '</span> <button type="button" data-featured-remove class="button-link" aria-label="' . esc_attr(sprintf(__('Remove %s', 'llms-txt-composer'), $label)) . '">' . esc_html__('Remove', 'llms-txt-composer') . '</button></li>';
         }
         echo '</ul><details class="llms-txt-composer-advanced"><summary>' . esc_html__('Advanced: edit post IDs manually', 'llms-txt-composer') . '</summary>';
-        echo '<p><label for="al-high">' . esc_html__('Featured post IDs (comma-separated)', 'llms-txt-composer') . '</label><input class="widefat" id="al-high" name="amino_llms[highlight_ids]" value="' . esc_attr((string) $s['highlight_ids']) . '"></p></details></div>';
+        echo '<p><label for="al-high">' . esc_html__('Featured post IDs (comma-separated)', 'llms-txt-composer') . '</label><input class="widefat" id="al-high" name="amino_llms[highlight_ids]" value="' . esc_attr((string) $s['highlight_ids']) . '"></p></details></div></div>';
         submit_button(__('Save and update llms.txt', 'llms-txt-composer'));
         echo '</form>';
         if (is_array(get_option(self::PREVIOUS, null))) {
