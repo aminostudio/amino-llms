@@ -141,7 +141,7 @@ $original_settings = get_option('llms_txt_composer_settings', false);
 $original_transients = $GLOBALS['transients'];
 $good_draft = Amino_LLMS::draft_preview([
     'mode' => 'manual',
-    'manual_markdown' => "# Draft Preview Only\\n\\n## Links\\n- [Example](https://example.test/)",
+    'manual_markdown' => "# Draft Preview Only\n\n## Links\n- [Example](https://example.test/)",
     'post_types' => ['post'],
     'highlight_ids' => '',
 ]);
@@ -153,7 +153,7 @@ check(get_option('llms_txt_composer_settings', false) === $original_settings &&
     $GLOBALS['transients'] === $original_transients, 'Draft preview never persists options or alters cached public output');
 $GLOBALS['ajax_admin'] = false;
 $GLOBALS['ajax_nonce_valid'] = true;
-$_POST['amino_llms'] = ['mode' => 'manual', 'manual_markdown' => "# Admin Draft\\n"];
+$_POST['amino_llms'] = ['mode' => 'manual', 'manual_markdown' => "# Admin Draft\n"];
 Amino_LLMS::ajax_preview_draft();
 check(!$GLOBALS['ajax_result']['success'] && $GLOBALS['ajax_result']['code'] === 403, 'Draft preview rejects non-administrators');
 $GLOBALS['ajax_admin'] = true;
