@@ -9,13 +9,15 @@
 - [x] Hide private, draft, password-protected and common noindex content.
 - [x] Cache output briefly, clear on content edits, and support settings rollback.
 - [x] Build an installable ZIP through GitHub Actions.
-- [ ] Validate actual WordPress HTTP behavior and Plugin Check after the virtual-route pivot.
-- [ ] Test saving manual/hybrid content in a real WordPress admin and behavior with page caches.
-- [ ] Resolve any review findings, ship a versioned 1.2.0 stable archive.
+- [x] Validate real WordPress HTTP 200/503 behavior and Plugin Check in disposable GitHub CI.
+- [x] Exercise real WordPress admin-post save/restore handlers in CI across Manual/Hybrid modes.
+- [ ] Validate keyboard, responsive UX and page-cache/CDN behavior on LAB in an actual browser.
+- [ ] Approve a stable Composer release after the 1.3.0 beta passes LAB and WordPress.org preflight.
 
 ## After first public distribution
 
-- [ ] Searchable visual content selector, replacing numeric post IDs.
+- [x] Searchable text-based public-content picker with keyboard controls, plus advanced manual ID fallback (v1.3 beta).
+- [ ] Richer visual selection and ordering without exposing private/noindex content.
 - [ ] Stronger SEO visibility adapters and exclusions.
 - [ ] Multilingual WordPress admin and full document localization.
 - [ ] Richer structural validation and optional resource descriptions.

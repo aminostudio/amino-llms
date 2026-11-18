@@ -10,7 +10,7 @@ LLMs.txt Composer is an independent, lightweight WordPress plugin for publishing
 
 **No external AI service. No telemetry. No server-root file writes.**
 
-## What ships in 1.2.0
+## Features in the 1.3.0 beta candidate
 
 - Automatic mode: site identity and links to recently published public content.
 - Manual mode: complete Markdown authoring in the WordPress admin.
@@ -19,7 +19,8 @@ LLMs.txt Composer is an independent, lightweight WordPress plugin for publishing
 - Markdown preview and a one-step restore of prior settings.
 - Filter private, draft, password-protected and common noindex content.
 - Serve **/llms.txt** through WordPress rewrite, with short-lived caching and cache invalidation after content updates.
-- Show a warning when an existing physical `llms.txt` may take precedence.
+- Show local delivery diagnostics for Markdown validity, pretty permalinks and physical `llms.txt` file conflicts. These checks cannot confirm the web server/CDN route.
+- Show mode-specific fields for Automatic, Manual and Hybrid, without discarding hidden content.
 
 **Why virtual delivery?** It eliminates filesystem permissions and destructive updates for most installations. The plugin never removes existing static files. Server and competing-plugin routing still need attention.
 
@@ -28,14 +29,14 @@ LLMs.txt Composer is an independent, lightweight WordPress plugin for publishing
 CI builds a versioned WordPress ZIP from the plugin header/readme (plus a verified SHA-256 manifest). GitHub Actions runs on PRs and `main` only, avoiding duplicate feature-branch jobs. Automatic GitHub release publication remains disabled; publishing and WordPress.org submission require an explicit release decision.
 
 
-Installable ZIPs are built by [GitHub Actions](.github/workflows/package.yml) and published on [GitHub Releases](https://github.com/aminostudio/llms-txt-composer/releases), rather than requiring users to ZIP the entire repository.
+Installable ZIPs are built by [GitHub Actions](.github/workflows/package.yml) and retained as workflow artifacts. Approved public releases can be published separately on [GitHub Releases](https://github.com/aminostudio/llms-txt-composer/releases); the 1.3.0 beta is **not** auto-published.
 
 ```bash
 php -l plugin/llms-txt-composer/llms-txt-composer.php
 php tests/portable.php
 ```
 
-CI also runs WordPress Plugin Check and an HTTP smoke test against a disposable WordPress instance. See [ROADMAP.md](ROADMAP.md) for remaining work and [SECURITY.md](SECURITY.md) for reporting.
+CI also runs WordPress Plugin Check and an HTTP smoke test against a disposable WordPress instance. See [the v1.3 LAB acceptance checklist](docs/LAB-QA-v1.3.0-beta.1.md) before staging or distributing the beta. See [ROADMAP.md](ROADMAP.md) for remaining work and [SECURITY.md](SECURITY.md) for reporting.
 
 ### Rename and safe migration from Amino LLMS 1.2.1
 
