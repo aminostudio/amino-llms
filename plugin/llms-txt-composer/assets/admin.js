@@ -34,19 +34,44 @@
   function syncIds(next) {
     idsField.value = [...new Set(next)].slice(0, 10).join(',');
   }
-  function item(id, title) {
+  function item(id, title, note = '') {
     const li = document.createElement('li');
     li.dataset.featuredId = String(id);
-    const span = document.createElement('span');
-    span.textContent = title;
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.className = 'button-link';
-    remove.dataset.featuredRemove = '';
-    remove.setAttribute('aria-label', cfg.remove + ' ' + title);
-    remove.textContent = cfg.remove;
-    li.append(span, remove);
+    const heading = document.createElement('strong');
+    heading.className = 'llms-featured-title';
+    heading.textContent = title;
+
+    const label = document.createElement('label');
+    label.append(document.createTextNode(cfg.note + ' '));
+    const extra = document.createElement('span');
+    extra.className = 'screen-reader-text';
+    extra.textContent = title;
+    const field = document.createElement('input');
+    field.type = 'text';
+    field.maxLength = 180;
+    field.className = 'widefat';
+    field.name = 'amino_llms[featured_descriptions][' + id + ']';
+    field.value = note;
+    label.append(extra, field);
+
+    const actions = document.createElement('div');
+    actions.className = 'llms-featured-actions';
+    for (const [action, caption] of [
+      ['up', cfg.moveUp], ['down', cfg.moveDown], ['remove', cfg.remove]
+    ]) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'button-link';
+      button.dataset['featured' + action[0].toUpperCase() + action.slice(1)] = '';
+      button.setAttribute('aria-label', caption + ': ' + title);
+      button.textContent = caption;
+      actions.append(button);
+    }
+    li.append(heading, label, actions);
     return li;
+  }
+  function syncFromSelected() {
+    syncIds([...selected.querySelectorAll('li[data-featured-id]')].map((li) => Number(li.dataset.featuredId)));
   }
   function reconcile() {
     const chosen = ids();
@@ -56,12 +81,22 @@
   }
   idsField.addEventListener('input', reconcile);
   selected.addEventListener('click', (event) => {
-    const button = event.target.closest('button[data-featured-remove]');
+    const button = event.target.closest('button[data-featured-remove], button[data-featured-up], button[data-featured-down]');
     if (!button) return;
     const li = button.closest('li[data-featured-id]');
-    const next = ids().filter((id) => id !== Number(li.dataset.featuredId));
-    syncIds(next);
-    li.remove();
+    if (!li) return;
+    if (button.hasAttribute('data-featured-remove')) {
+      li.remove();
+      syncFromSelected();
+      return;
+    }
+    if (button.hasAttribute('data-featured-up') && li.previousElementSibling) {
+      selected.insertBefore(li, li.previousElementSibling);
+    } else if (button.hasAttribute('data-featured-down') && li.nextElementSibling) {
+      li.nextElementSibling.after(li);
+    }
+    syncFromSelected();
+    button.focus();
   });
   results.addEventListener('click', (event) => {
     const button = event.target.closest('button[data-featured-select]');

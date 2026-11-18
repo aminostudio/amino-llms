@@ -20,3 +20,11 @@
 .llms-txt-composer-diagnostics li span{display:block;line-height:1.5}
 .llms-txt-composer-diagnostics .description{margin:12px 0 0}
 @media(max-width:850px){.llms-txt-composer-diagnostics ul{grid-template-columns:1fr}}
+
+/* v2.0 editor: keyboard-operable ordered highlights and per-link notes. */
+.llms-txt-composer-selected li{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;padding:12px}
+.llms-txt-composer-selected .llms-featured-title{display:block;overflow-wrap:anywhere}
+.llms-txt-composer-selected label{display:block;font-weight:500}
+.llms-txt-composer-selected label input{font-weight:400;margin-top:4px;max-width:100%}
+.llms-featured-actions{display:flex;gap:14px;flex-wrap:wrap}
+.llms-featured-actions .button-link{min-height:32px}
