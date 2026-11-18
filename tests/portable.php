@@ -47,7 +47,8 @@ $GLOBALS['types'] = [
     'attachment' => (object) ['name' => 'attachment', 'public' => true, 'labels' => (object) ['name' => 'Media']],
     'private_cpt' => (object) ['name' => 'private_cpt', 'public' => false, 'labels' => (object) ['name' => 'Private']],
 ];
-function add_action(...$args): void {}
+$GLOBALS['actions'] = [];
+function add_action(...$args): void {$GLOBALS['actions'][$args[0]][] = $args[1] ?? null;}
 function add_filter(...$args): void {}
 function register_activation_hook(...$args): void {}
 function register_deactivation_hook(...$args): void {}
@@ -219,6 +220,12 @@ update_option('llms_txt_composer_settings', $hybrid);
 $first = Amino_LLMS::current_document();
 check($first === $doc, 'Public document generated from settings');
 check($GLOBALS['transients']['llms_txt_composer_document_cache'] === $doc, 'Document cached');
+check(isset($GLOBALS['actions']['update_option_home']), 'Public home URL changes register a cache invalidation hook');
+foreach ($GLOBALS['actions']['update_option_home'] as $callback) {
+    $callback();
+}
+check(!isset($GLOBALS['transients']['llms_txt_composer_document_cache']), 'Changing the WordPress home URL clears stale llms.txt links');
+Amino_LLMS::current_document();
 Amino_LLMS::invalidate();
 check(!isset($GLOBALS['transients']['llms_txt_composer_document_cache']), 'Cache invalidated on edits');
 $automatic = $hybrid;
