@@ -25,6 +25,9 @@ LLMs.txt Composer is an independent, lightweight WordPress plugin for publishing
 
 ### Developer build
 
+CI builds a versioned WordPress ZIP from the plugin header/readme (plus a verified SHA-256 manifest). GitHub Actions runs on PRs and `main` only, avoiding duplicate feature-branch jobs. Automatic GitHub release publication remains disabled; publishing and WordPress.org submission require an explicit release decision.
+
+
 Installable ZIPs are built by [GitHub Actions](.github/workflows/package.yml) and published on [GitHub Releases](https://github.com/aminostudio/llms-txt-composer/releases), rather than requiring users to ZIP the entire repository.
 
 ```bash
