@@ -71,12 +71,21 @@
     return li;
   }
   function syncFromSelected() {
-    syncIds([...selected.querySelectorAll('li[data-featured-id]')].map((li) => Number(li.dataset.featuredId)));
+    const shown = [...selected.querySelectorAll('li[data-featured-id]')].map((li) => Number(li.dataset.featuredId));
+    // Do not silently discard IDs entered through the advanced input field.
+    syncIds([...shown, ...ids().filter((id) => !shown.includes(id))]);
   }
   function reconcile() {
     const chosen = ids();
-    selected.querySelectorAll('li[data-featured-id]').forEach((li) => {
-      if (!chosen.includes(Number(li.dataset.featuredId))) li.remove();
+    const existing = new Map(
+      [...selected.querySelectorAll('li[data-featured-id]')].map((li) => [Number(li.dataset.featuredId), li])
+    );
+    existing.forEach((li, id) => {
+      if (!chosen.includes(id)) li.remove();
+    });
+    // Reflect advanced-field order in the visible cards as well.
+    chosen.forEach((id) => {
+      if (existing.has(id)) selected.append(existing.get(id));
     });
   }
   idsField.addEventListener('input', reconcile);
@@ -86,8 +95,9 @@
     const li = button.closest('li[data-featured-id]');
     if (!li) return;
     if (button.hasAttribute('data-featured-remove')) {
+      const remaining = ids().filter((id) => id !== Number(li.dataset.featuredId));
       li.remove();
-      syncFromSelected();
+      syncIds(remaining);
       return;
     }
     if (button.hasAttribute('data-featured-up') && li.previousElementSibling) {
@@ -119,6 +129,39 @@
     status.textContent = cfg.added;
     input.focus();
   });
+  // The probe is triggered only by an administrator's button click.
+  // WordPress performs a separate public HTTP request without admin cookies.
+  const probeButton = document.getElementById('al-verify-public-route');
+  const probeStatus = document.getElementById('al-public-probe-status');
+  if (probeButton && probeStatus) {
+    probeButton.addEventListener('click', async () => {
+      probeButton.disabled = true;
+      probeStatus.textContent = cfg.probing;
+      probeStatus.dataset.state = 'checking';
+      try {
+        const body = new URLSearchParams({
+          action: 'amino_llms_probe', nonce: cfg.probeNonce
+        });
+        const response = await fetch(cfg.ajaxUrl, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', Accept: 'application/json' },
+          body: body.toString()
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success || !data.data) throw new Error('probe');
+        probeStatus.dataset.state = data.data.state;
+        probeStatus.textContent = data.data.message + ' (HTTP ' + data.data.status +
+          (data.data.mime ? ', ' + data.data.mime : '') + ')';
+      } catch (_) {
+        probeStatus.dataset.state = 'unreachable';
+        probeStatus.textContent = cfg.probeFailed;
+      } finally {
+        probeButton.disabled = false;
+      }
+    });
+  }
+
   input.addEventListener('input', () => {
     clearTimeout(delay);
     const myRequest = ++serial;

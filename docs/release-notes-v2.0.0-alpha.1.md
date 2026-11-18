@@ -8,3 +8,6 @@ This major-version **alpha** introduces human-curated descriptions and ordering 
 - No API keys, telemetry, site-root writes, remote services or production deployment.
 
 **QA required:** GitHub PHP matrix, WordPress Plugin Check/runtime, ZIP integrity; after CI succeeds install on LAB and test keyboard reorder, descriptions, Markdown, rollback and caching. Do not publish to WordPress.org until a separate approved stable release.
+
+- Adds an optional live public-URL check. An administrator triggers a bounded anonymous server-side request to /llms.txt; a Composer-specific response header distinguishes the plugin from Under Construction HTML, static files and caches.
+- Detects interception without changing other plugins or bypassing LAB maintenance mode. The probe does not send administrator cookies.
