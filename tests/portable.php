@@ -99,6 +99,17 @@ function wp_send_json_error($data, $code = 400): void {$GLOBALS['ajax_result'] =
 require dirname(__DIR__) . '/plugin/llms-txt-composer/llms-txt-composer.php';
 
 $checks = 0;
+class WP_Error {
+    public function __construct(public string $code = 'probe_failure') {}
+}
+function is_wp_error($response): bool {return $response instanceof WP_Error;}
+function wp_remote_retrieve_response_code($response): int {return (int) ($response['response']['code'] ?? 0);}
+function wp_remote_retrieve_header($response, $name): string {return (string) ($response['headers'][strtolower($name)] ?? '');}
+function wp_remote_retrieve_body($response): string {return (string) ($response['body'] ?? '');}
+function wp_safe_remote_get($url, $args = []): array {
+    $GLOBALS['probe_args'] = ['url' => $url, 'options' => $args];
+    return $GLOBALS['probe_response'] ?? ['response' => ['code' => 200], 'headers' => [], 'body' => ''];
+}
 function check(bool $condition, string $message): void {
     global $checks;
     if (!$condition) throw new RuntimeException('FAIL: ' . $message);
@@ -124,6 +135,43 @@ check(in_array('amino_llms_document', Amino_LLMS::query_vars([]), true), 'Public
 $defaults = Amino_LLMS::defaults();
 check($defaults['mode'] === 'hybrid', 'Hybrid is the default');
 check($defaults['post_types'] === ['page', 'post'], 'Pages and posts are included by default');
+
+$public_ok = [
+    'response' => ['code' => 200],
+    'headers' => ['content-type' => 'text/plain; charset=UTF-8', 'x-llms-txt-composer' => '2.0.0-alpha.1'],
+    'body' => "# LAB Preview\n\n## Main Pages\n",
+];
+check(Amino_LLMS::assess_public_response($public_ok)['state'] === 'verified', 'Live probe confirms its own signed Markdown HTTP response');
+$blocked = [
+    'response' => ['code' => 503],
+    'headers' => ['content-type' => 'text/html'],
+    'body' => '<html>Under Construction</html>',
+];
+check(Amino_LLMS::assess_public_response($blocked)['state'] === 'intercepted', 'Live probe detects HTML from Under Construction instead of Composer');
+$bad = $public_ok;
+$bad['response']['code'] = 503;
+check(Amino_LLMS::assess_public_response($bad)['state'] === 'invalid', 'Signed HTTP 503 from Composer is classified as invalid output');
+check(Amino_LLMS::assess_public_response(new WP_Error())['state'] === 'unreachable', 'Blocked site loopback produces safe unreachable status');
+$GLOBALS['probe_response'] = $public_ok;
+Amino_LLMS::probe_public_endpoint();
+check(
+    $GLOBALS['probe_args']['url'] === 'https://example.test/llms.txt' &&
+    $GLOBALS['probe_args']['options']['redirection'] === 0 &&
+    $GLOBALS['probe_args']['options']['limit_response_size'] === 4096,
+    'Live probe targets only the local public endpoint without redirects'
+);
+$GLOBALS['ajax_admin'] = false;
+$GLOBALS['ajax_nonce_valid'] = true;
+Amino_LLMS::ajax_probe();
+check(!$GLOBALS['ajax_result']['success'] && $GLOBALS['ajax_result']['code'] === 403, 'Public-route probe denies non-admin users');
+$GLOBALS['ajax_admin'] = true;
+$GLOBALS['ajax_nonce_valid'] = false;
+Amino_LLMS::ajax_probe();
+check(!$GLOBALS['ajax_result']['success'] && $GLOBALS['ajax_result']['code'] === 403, 'Public-route probe denies invalid nonce');
+$GLOBALS['ajax_nonce_valid'] = true;
+Amino_LLMS::ajax_probe();
+check($GLOBALS['ajax_result']['success'] && $GLOBALS['ajax_result']['data']['state'] === 'verified', 'Authorized public route probe returns classified HTTP findings');
+
 check(
     Amino_LLMS::delivery_diagnostics("# Ready\n", false, true) === ['markdown' => true, 'permalinks' => true, 'root_file' => true],
     'Delivery checks accept valid Markdown, pretty permalinks and no physical-file conflict'
