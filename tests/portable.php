@@ -186,6 +186,37 @@ check($clean['post_types'] === ['page', 'book'], 'Nonpublic, media and repeated 
 check($clean['items_per_type'] === 25, 'Per-type limit enforced');
 check($clean['highlight_ids'] === '1,2', 'Highlights sanitized and deduplicated');
 check($clean['summary'] === 'A small website', 'HTML stripped from short summary');
+
+$previous_handler = set_error_handler(
+    static function (int $severity, string $message): bool {
+        throw new RuntimeException('Malformed editor payload triggered a PHP warning: ' . $message);
+    }
+);
+try {
+    $bad = Amino_LLMS::clean_settings([
+        'mode' => ['manual'],
+        'site_name' => ['nested' => '<b>Injected</b>'],
+        'summary' => ['unexpected'],
+        'introduction' => ['unexpected'],
+        'manual_markdown' => ['unexpected'],
+        'post_types' => [['post'], 'post', 'page', ['private_cpt']],
+        'items_per_type' => ['500'],
+        'highlight_ids' => [['2'], '1', 2, ['3']],
+    ]);
+} finally {
+    restore_error_handler();
+}
+check(
+    $bad['mode'] === 'hybrid' && $bad['site_name'] === '' &&
+    $bad['summary'] === '' && $bad['introduction'] === '' &&
+    $bad['manual_markdown'] === '' && $bad['items_per_type'] === 8,
+    'Malformed nested editor values fall back safely without PHP warnings'
+);
+check(
+    $bad['post_types'] === ['post', 'page'] && $bad['highlight_ids'] === '1,2',
+    'Malformed post types and highlight IDs are ignored without losing valid selections'
+);
+
 check(Amino_LLMS::valid_document(Amino_LLMS::render($clean)), 'Manual Markdown is accepted with a top heading');
 check(str_contains(Amino_LLMS::render($clean), 'my%20file.pdf'), 'Manual Markdown preserves percent-encoded URLs');
 

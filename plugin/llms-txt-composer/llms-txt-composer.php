@@ -119,31 +119,51 @@ final class Amino_LLMS {
     }
 
     public static function clean_settings(array $input): array {
-        $mode = sanitize_key((string) ($input['mode'] ?? 'hybrid'));
+        // Admin forms normally submit strings, but third-party callers can
+        // supply nested arrays. Reject malformed shapes without PHP warnings.
+        $raw_mode = $input['mode'] ?? 'hybrid';
+        $mode = is_string($raw_mode) ? sanitize_key($raw_mode) : 'hybrid';
         if (!in_array($mode, ['automatic', 'manual', 'hybrid'], true)) {
             $mode = 'hybrid';
         }
+
         $available = array_keys(self::public_types());
         $raw_types = isset($input['post_types']) && is_array($input['post_types']) ? $input['post_types'] : [];
-        $selected = array_values(array_unique(array_intersect($available, array_map('sanitize_key', $raw_types))));
-        $ids = [];
+        $type_names = array_map('sanitize_key', array_filter($raw_types, 'is_string'));
+        $selected = array_values(array_unique(array_intersect($available, $type_names)));
+
         $raw_ids = $input['highlight_ids'] ?? '';
-        $parts = is_array($raw_ids) ? $raw_ids : preg_split('/[\s,]+/', (string) $raw_ids, -1, PREG_SPLIT_NO_EMPTY);
+        $parts = is_array($raw_ids) ? $raw_ids :
+            (is_string($raw_ids) || is_int($raw_ids)
+                ? preg_split('/[\\s,]+/', (string) $raw_ids, -1, PREG_SPLIT_NO_EMPTY)
+                : []);
+        $ids = [];
         foreach ($parts ?: [] as $part) {
+            if (!is_string($part) && !is_int($part)) {
+                continue;
+            }
             $id = (string) $part;
             if (preg_match('/^[1-9][0-9]*$/D', $id) && !in_array((int) $id, $ids, true)) {
                 $ids[] = (int) $id;
             }
         }
+
+        $name = is_string($input['site_name'] ?? null) ? $input['site_name'] : '';
+        $summary = is_string($input['summary'] ?? null) ? $input['summary'] : '';
+        $intro = is_string($input['introduction'] ?? null) ? $input['introduction'] : '';
+        $manual = is_string($input['manual_markdown'] ?? null) ? $input['manual_markdown'] : '';
+        $raw_limit = $input['items_per_type'] ?? 8;
+        $item_limit = is_scalar($raw_limit) && is_numeric($raw_limit) ? absint($raw_limit) : 8;
+
         return [
             'mode' => $mode,
-            'site_name' => self::limit(sanitize_text_field((string) ($input['site_name'] ?? '')), 160),
-            'summary' => self::limit(sanitize_text_field((string) ($input['summary'] ?? '')), 500),
-            // Markdown is plain text, not HTML. Preserve percent-encoded links and code fences.
-            'introduction' => self::sanitize_markdown((string) ($input['introduction'] ?? ''), 12000),
-            'manual_markdown' => self::sanitize_markdown((string) ($input['manual_markdown'] ?? ''), self::MAX_BYTES),
+            'site_name' => self::limit(sanitize_text_field($name), 160),
+            'summary' => self::limit(sanitize_text_field($summary), 500),
+            // Markdown stays plain text and preserves percent-encoded links.
+            'introduction' => self::sanitize_markdown($intro, 12000),
+            'manual_markdown' => self::sanitize_markdown($manual, self::MAX_BYTES),
             'post_types' => $selected,
-            'items_per_type' => max(1, min(25, absint($input['items_per_type'] ?? 8))),
+            'items_per_type' => max(1, min(25, $item_limit)),
             'highlight_ids' => implode(',', array_slice($ids, 0, 10)),
         ];
     }
