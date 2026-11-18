@@ -19,7 +19,7 @@ LLMs.txt Composer is an independent, lightweight WordPress plugin for publishing
 - Markdown preview and a one-step restore of prior settings.
 - Filter private, draft, password-protected and common noindex content.
 - Serve **/llms.txt** through WordPress rewrite, with short-lived caching and cache invalidation after content updates.
-- Show local delivery diagnostics for Markdown validity, pretty permalinks and physical `llms.txt` file conflicts. These checks cannot confirm the web server/CDN route.
+- Show local delivery diagnostics for Markdown validity, pretty permalinks and physical `llms.txt` file conflicts. A separate administrator-only HTTP probe can detect an actual HTML maintenance page or another route provider.
 - Show mode-specific fields for Automatic, Manual and Hybrid, without discarding hidden content.
 
 **Why virtual delivery?** It eliminates filesystem permissions and destructive updates for most installations. The plugin never removes existing static files. Server and competing-plugin routing still need attention.
