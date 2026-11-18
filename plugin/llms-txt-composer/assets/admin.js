@@ -31,8 +31,17 @@
   function ids() {
     return [...new Set(idsField.value.split(/[\s,]+/).filter((x) => /^[1-9]\d*$/.test(x)).map(Number))].slice(0, 10);
   }
+  function markPreviewDirty() {
+    const message = document.getElementById('al-preview-message');
+    if (message) {
+      message.textContent = cfg.previewDirty;
+      message.dataset.state = 'dirty';
+    }
+  }
   function syncIds(next) {
     idsField.value = [...new Set(next)].slice(0, 10).join(',');
+    // Programmatic updates do not dispatch form input/change events.
+    markPreviewDirty();
   }
   function item(id, title, note = '') {
     const li = document.createElement('li');
@@ -138,14 +147,13 @@
   const previewMessage = document.getElementById('al-preview-message');
   const previewBytes = document.getElementById('al-preview-bytes');
   if (editorForm && draftButton && previewTarget && previewMessage && previewBytes) {
-    editorForm.addEventListener('input', () => {
-      previewMessage.textContent = cfg.previewDirty;
-      previewMessage.dataset.state = 'dirty';
-    });
-    editorForm.addEventListener('change', () => {
-      previewMessage.textContent = cfg.previewDirty;
-      previewMessage.dataset.state = 'dirty';
-    });
+    const onEdit = (event) => {
+      // Search terms are transient UI values, not editorial settings.
+      if (event.target && typeof event.target.name === 'string' &&
+          event.target.name.startsWith('amino_llms[')) markPreviewDirty();
+    };
+    editorForm.addEventListener('input', onEdit);
+    editorForm.addEventListener('change', onEdit);
     draftButton.addEventListener('click', async () => {
       draftButton.disabled = true;
       previewMessage.textContent = cfg.previewing;
