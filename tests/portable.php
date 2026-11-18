@@ -99,6 +99,7 @@ function wp_send_json_error($data, $code = 400): void {$GLOBALS['ajax_result'] =
 require dirname(__DIR__) . '/plugin/llms-txt-composer/llms-txt-composer.php';
 
 $checks = 0;
+function __($text, $domain = ''): string {return (string) $text;}
 class WP_Error {
     public function __construct(public string $code = 'probe_failure') {}
 }
