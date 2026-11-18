@@ -141,6 +141,19 @@ check([] === Amino_LLMS::find_featured_posts('Password story'), 'Editor search h
 check([] === Amino_LLMS::find_featured_posts('Private story'), 'Editor search hides private entries');
 check([] === Amino_LLMS::find_featured_posts('Home page'), 'Editor search skips front page duplicated by generator');
 check([] === Amino_LLMS::find_featured_posts('a'), 'Editor search refuses single-character terms');
+
+foreach (range(2000, 2079) as $id) {
+    $GLOBALS['posts'][] = new WP_Post($id, 'post', 'publish', 'Hidden topic ' . $id, 'hidden-' . $id, '2026-12-01');
+    $GLOBALS['post_meta'][$id] = ['_yoast_wpseo_meta-robots-noindex' => '1'];
+}
+$GLOBALS['posts'][] = new WP_Post(2080, 'post', 'publish', 'Visible topic document', 'visible-topic', '2026-10-01');
+$found_deep = Amino_LLMS::find_featured_posts('topic');
+check(count($found_deep) === 1 && 2080 === $found_deep[0]['id'], 'Featured search scans beyond 60 excluded hits without leaking noindex records');
+$GLOBALS['posts'] = array_values(array_filter($GLOBALS['posts'], static fn($post) => $post->ID < 2000));
+foreach (range(2000, 2079) as $id) {
+    unset($GLOBALS['post_meta'][$id]);
+}
+
 $GLOBALS['ajax_admin'] = false;
 $GLOBALS['ajax_nonce_valid'] = true;
 $_GET['q'] = 'technology';

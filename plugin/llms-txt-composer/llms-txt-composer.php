@@ -395,31 +395,39 @@ final class Amino_LLMS {
         if (!$types) {
             return [];
         }
-        $posts = get_posts([
-            'post_type' => array_keys($types),
-            'post_status' => 'publish',
-            's' => $query,
-            'posts_per_page' => 60,
-            'orderby' => 'relevance',
-            'no_found_rows' => true,
-            'ignore_sticky_posts' => true,
-            'suppress_filters' => false,
-        ]);
         $results = [];
         $home_id = absint(get_option('page_on_front', 0));
-        foreach ($posts as $post) {
-            if (!($post instanceof WP_Post) || $post->ID === $home_id || !self::allowed_post($post)) {
-                continue;
+        // Excluded/noindex posts can fill the first result page. Scan bounded
+        // additional pages rather than wrongly reporting zero eligible matches.
+        for ($batch = 0; $batch < 5; $batch++) {
+            $posts = get_posts([
+                'post_type' => array_keys($types),
+                'post_status' => 'publish',
+                's' => $query,
+                'posts_per_page' => 40,
+                'offset' => $batch * 40,
+                'orderby' => 'relevance',
+                'no_found_rows' => true,
+                'ignore_sticky_posts' => true,
+                'suppress_filters' => false,
+            ]);
+            foreach ($posts as $post) {
+                if (!($post instanceof WP_Post) || $post->ID === $home_id || !self::allowed_post($post)) {
+                    continue;
+                }
+                if (self::link($post) === '') {
+                    continue;
+                }
+                $results[] = [
+                    'id' => (int) $post->ID,
+                    'title' => self::limit(wp_strip_all_tags((string) get_the_title($post)), 160),
+                    'type' => (string) $types[$post->post_type]->labels->name,
+                ];
+                if (count($results) >= 10) {
+                    break;
+                }
             }
-            if (self::link($post) === '') {
-                continue;
-            }
-            $results[] = [
-                'id' => (int) $post->ID,
-                'title' => self::limit(wp_strip_all_tags((string) get_the_title($post)), 160),
-                'type' => (string) $types[$post->post_type]->labels->name,
-            ];
-            if (count($results) === 10) {
+            if (count($results) >= 10 || count($posts) < 40) {
                 break;
             }
         }
