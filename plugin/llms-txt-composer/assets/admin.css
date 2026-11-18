@@ -36,3 +36,9 @@
 #al-public-probe-status[data-state="intercepted"],
 #al-public-probe-status[data-state="invalid"],
 #al-public-probe-status[data-state="unreachable"]{color:#8e5213}
+
+/* v2.0 alpha.2: clear states for editor previews that are not yet public. */
+#al-preview-message[data-state="valid"]{color:#117c5f}
+#al-preview-message[data-state="invalid"]{color:#a14629}
+#al-preview-message[data-state="dirty"]{color:#74508b}
+#al-preview-draft[disabled]{opacity:.66}

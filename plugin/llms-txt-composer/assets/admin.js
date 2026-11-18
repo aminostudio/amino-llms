@@ -129,6 +129,53 @@
     status.textContent = cfg.added;
     input.focus();
   });
+
+  // Preview the entire unsaved form without updating WordPress options or
+  // invalidating the public cache. All content is rendered as textarea text.
+  const editorForm = root.closest('form');
+  const draftButton = document.getElementById('al-preview-draft');
+  const previewTarget = document.getElementById('al-markdown-preview');
+  const previewMessage = document.getElementById('al-preview-message');
+  const previewBytes = document.getElementById('al-preview-bytes');
+  if (editorForm && draftButton && previewTarget && previewMessage && previewBytes) {
+    editorForm.addEventListener('input', () => {
+      previewMessage.textContent = cfg.previewDirty;
+      previewMessage.dataset.state = 'dirty';
+    });
+    editorForm.addEventListener('change', () => {
+      previewMessage.textContent = cfg.previewDirty;
+      previewMessage.dataset.state = 'dirty';
+    });
+    draftButton.addEventListener('click', async () => {
+      draftButton.disabled = true;
+      previewMessage.textContent = cfg.previewing;
+      previewMessage.dataset.state = 'checking';
+      try {
+        const data = new FormData(editorForm);
+        data.set('action', 'amino_llms_preview_draft');
+        data.set('nonce', cfg.previewNonce);
+        const response = await fetch(cfg.ajaxUrl, {
+          method: 'POST', credentials: 'same-origin',
+          headers: { Accept: 'application/json' }, body: data
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success || !result.data ||
+            typeof result.data.document !== 'string' ||
+            typeof result.data.valid !== 'boolean' ||
+            typeof result.data.bytes !== 'number') throw new Error('draft');
+        previewTarget.value = result.data.document;
+        previewBytes.textContent = String(result.data.bytes);
+        previewMessage.dataset.state = result.data.valid ? 'valid' : 'invalid';
+        previewMessage.textContent = result.data.valid ? cfg.previewReady : cfg.previewInvalid;
+      } catch (_) {
+        previewMessage.dataset.state = 'invalid';
+        previewMessage.textContent = cfg.previewFailed;
+      } finally {
+        draftButton.disabled = false;
+      }
+    });
+  }
+
   // The probe is triggered only by an administrator's button click.
   // WordPress performs a separate public HTTP request without admin cookies.
   const probeButton = document.getElementById('al-verify-public-route');

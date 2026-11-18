@@ -137,6 +137,37 @@ $defaults = Amino_LLMS::defaults();
 check($defaults['mode'] === 'hybrid', 'Hybrid is the default');
 check($defaults['post_types'] === ['page', 'post'], 'Pages and posts are included by default');
 
+$original_settings = get_option('llms_txt_composer_settings', false);
+$original_transients = $GLOBALS['transients'];
+$good_draft = Amino_LLMS::draft_preview([
+    'mode' => 'manual',
+    'manual_markdown' => "# Draft Preview Only\\n\\n## Links\\n- [Example](https://example.test/)",
+    'post_types' => ['post'],
+    'highlight_ids' => '',
+]);
+check($good_draft['valid'] && str_starts_with($good_draft['document'], '# Draft Preview Only'), 'Unsaved manual draft is rendered on demand');
+check($good_draft['bytes'] === strlen($good_draft['document']), 'Draft byte count reports actual UTF-8 output size');
+$bad_draft = Amino_LLMS::draft_preview(['mode' => 'manual', 'manual_markdown' => 'Draft without heading']);
+check(!$bad_draft['valid'], 'Unsaved invalid manual draft is rejected before publication');
+check(get_option('llms_txt_composer_settings', false) === $original_settings &&
+    $GLOBALS['transients'] === $original_transients, 'Draft preview never persists options or alters cached public output');
+$GLOBALS['ajax_admin'] = false;
+$GLOBALS['ajax_nonce_valid'] = true;
+$_POST['amino_llms'] = ['mode' => 'manual', 'manual_markdown' => "# Admin Draft\\n"];
+Amino_LLMS::ajax_preview_draft();
+check(!$GLOBALS['ajax_result']['success'] && $GLOBALS['ajax_result']['code'] === 403, 'Draft preview rejects non-administrators');
+$GLOBALS['ajax_admin'] = true;
+$GLOBALS['ajax_nonce_valid'] = false;
+Amino_LLMS::ajax_preview_draft();
+check(!$GLOBALS['ajax_result']['success'] && $GLOBALS['ajax_result']['code'] === 403, 'Draft preview rejects invalid nonce');
+$GLOBALS['ajax_nonce_valid'] = true;
+Amino_LLMS::ajax_preview_draft();
+check($GLOBALS['ajax_result']['success'] && $GLOBALS['ajax_result']['data']['valid'], 'Authorized AJAX draft preview returns rendered Markdown');
+check(get_option('llms_txt_composer_settings', false) === $original_settings &&
+    $GLOBALS['transients'] === $original_transients, 'AJAX draft preview never saves nor invalidates public cache');
+unset($_POST['amino_llms']);
+
+
 $public_ok = [
     'response' => ['code' => 200],
     'headers' => ['content-type' => 'text/plain; charset=UTF-8', 'x-llms-txt-composer' => '2.0.0-alpha.1'],

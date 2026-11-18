@@ -4,7 +4,7 @@ Tags: llms-txt, markdown, ai, content
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 2.0.0-alpha.1
+Stable tag: 2.0.0-alpha.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -19,7 +19,7 @@ A clear, human-guided llms.txt for WordPress. Automatic, Manual and Hybrid modes
 * **Hybrid:** combine your own editorial introduction with automatically updated links.
 * Choose which public content types appear (posts, pages, custom post types).
 * Highlight and order up to ten selected posts, add optional short descriptions for each, and set a per-type link limit.
-* Preview the resulting Markdown in WordPress administration.
+* Preview saved Markdown and test unsaved changes before publishing anything to /llms.txt.
 * Avoid private, draft, password-protected and commonly marked noindex content.
 * Save and restore the previous settings.
 * No file writes, external API keys, remote calls or telemetry.
@@ -63,6 +63,11 @@ Yes, publicly registered post types appear as options. The administrator control
 No. LLMs.txt Composer is independent. Disable other llms.txt generators to avoid URL conflicts.
 
 == Changelog ==
+
+= 2.0.0-alpha.2 =
+* Preview unsaved changes in Automatic, Manual or Hybrid mode without updating the public document.
+* Add an administrator-only, nonce-protected draft preview with validation and byte count.
+* Keep the live public HTTP diagnostics and v2.0 editorial highlights.
 
 = 2.0.0-alpha.1 =
 * Editorial featured links: custom descriptions and keyboard-accessible Up/Down ordering.
