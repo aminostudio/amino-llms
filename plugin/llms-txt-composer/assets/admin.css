@@ -8,3 +8,5 @@
 .llms-txt-composer-selected button{flex-shrink:0}
 .llms-txt-composer-advanced{margin-top:10px}
 .llms-txt-composer-advanced summary{cursor:pointer}
+
+.llms-txt-composer-admin [data-mode-show][hidden]{display:none!important}

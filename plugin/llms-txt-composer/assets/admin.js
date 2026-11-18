@@ -5,6 +5,21 @@
   const cfg = window.llmsComposerSearch;
   if (!root || !cfg) return;
 
+  // Show only the options relevant to the chosen document mode. Inputs stay
+  // enabled in hidden sections so switching modes never discards authored work.
+  const modeSelect = document.getElementById('al-mode');
+  if (modeSelect) {
+    const groups = document.querySelectorAll('[data-mode-show]');
+    const updateMode = () => {
+      const mode = modeSelect.value;
+      groups.forEach((group) => {
+        group.hidden = !group.dataset.modeShow.split(/\s+/).includes(mode);
+      });
+    };
+    modeSelect.addEventListener('change', updateMode);
+    updateMode();
+  }
+
   const input = root.querySelector('#al-featured-search');
   const idsField = root.querySelector('#al-high');
   const results = root.querySelector('#al-featured-results');
