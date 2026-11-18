@@ -77,8 +77,15 @@
   }
   function reconcile() {
     const chosen = ids();
-    selected.querySelectorAll('li[data-featured-id]').forEach((li) => {
-      if (!chosen.includes(Number(li.dataset.featuredId))) li.remove();
+    const existing = new Map(
+      [...selected.querySelectorAll('li[data-featured-id]')].map((li) => [Number(li.dataset.featuredId), li])
+    );
+    existing.forEach((li, id) => {
+      if (!chosen.includes(id)) li.remove();
+    });
+    // Reflect advanced-field order in the visible cards as well.
+    chosen.forEach((id) => {
+      if (existing.has(id)) selected.append(existing.get(id));
     });
   }
   idsField.addEventListener('input', reconcile);
