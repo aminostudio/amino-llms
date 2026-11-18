@@ -185,6 +185,27 @@ check($clean['mode'] === 'manual', 'Manual mode recognized');
 check($clean['post_types'] === ['page', 'book'], 'Nonpublic, media and repeated types excluded');
 check($clean['items_per_type'] === 25, 'Per-type limit enforced');
 check($clean['highlight_ids'] === '1,2', 'Highlights sanitized and deduplicated');
+$described = Amino_LLMS::clean_settings([
+    'mode' => 'hybrid',
+    'site_name' => 'Example Studio',
+    'post_types' => ['post', 'book'],
+    'highlight_ids' => '7,2,4,3,7',
+    'featured_descriptions' => [
+        '7' => 'Editorially selected [research] and <b>context</b>',
+        '2' => 'Second story - background',
+        '4' => 'Should not show noindex',
+        '3' => ['nested attack'],
+        '88' => 'Unselected item',
+    ],
+]);
+check($described['highlight_ids'] === '7,2,4,3', 'v2 retains curated user order and deduplicates legacy IDs');
+check($described['featured_descriptions'][7] === 'Editorially selected [research] and context', 'v2 descriptions strip HTML but preserve safe editorial characters');
+check(!isset($described['featured_descriptions'][88]) && !isset($described['featured_descriptions'][3]), 'v2 ignores unselected and malformed nested descriptions');
+$featured_doc = Amino_LLMS::render($described);
+check(str_contains($featured_doc, '[Book on technology](https://example.test/books/tech/): Editorially selected \\[research\\] and context'), 'v2 emits escaped Markdown descriptions only for public selected content');
+check(!str_contains($featured_doc, 'Should not show noindex'), 'v2 does not leak descriptions attached to noindex entries');
+check(strpos($featured_doc, 'Book on technology') < strpos($featured_doc, 'A second article'), 'v2 preserves user-defined featured link order in Markdown');
+
 check($clean['summary'] === 'A small website', 'HTML stripped from short summary');
 
 $previous_handler = set_error_handler(
@@ -202,6 +223,7 @@ try {
         'post_types' => [['post'], 'post', 'page', ['private_cpt']],
         'items_per_type' => ['500'],
         'highlight_ids' => [['2'], '1', 2, ['3']],
+        'featured_descriptions' => ['1' => ['malformed'], '2' => '<strong>Good</strong>', '99' => 'Unselected'],
     ]);
 } finally {
     restore_error_handler();
@@ -213,7 +235,8 @@ check(
     'Malformed nested editor values fall back safely without PHP warnings'
 );
 check(
-    $bad['post_types'] === ['post', 'page'] && $bad['highlight_ids'] === '1,2',
+    $bad['post_types'] === ['post', 'page'] && $bad['highlight_ids'] === '1,2' &&
+    $bad['featured_descriptions'] === [2 => 'Good'],
     'Malformed post types and highlight IDs are ignored without losing valid selections'
 );
 

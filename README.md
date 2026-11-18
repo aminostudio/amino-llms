@@ -4,7 +4,7 @@
 
 **Your website, clearly understood.**
 
-**v1.3.0-beta.1** adds an administrator-only title search to select featured public content, while retaining the hardened Markdown output from v1.2.1. This is a LAB validation candidate, not a public stable release.
+**v2.0.0-alpha.1** introduces ordered editorial highlights with optional per-link descriptions. Existing v1.3 settings are retained. This is an experimental LAB candidate, not a public stable release.
 
 LLMs.txt Composer is an independent, lightweight WordPress plugin for publishing a human-guided `llms.txt` in Markdown. **Automatic, Manual, and Hybrid** modes let site owners explain what matters rather than dumping a complete XML sitemap.
 
@@ -15,7 +15,7 @@ LLMs.txt Composer is an independent, lightweight WordPress plugin for publishing
 - Automatic mode: site identity and links to recently published public content.
 - Manual mode: complete Markdown authoring in the WordPress admin.
 - Hybrid mode: editorial introduction plus automatically generated links.
-- Select public WordPress post types and a link limit; search published content by title to add featured links (up to 10). The manual ID field remains available as an advanced fallback.
+- Select public WordPress post types and a link limit; search published content by title to add featured links (up to 10), reorder with keyboard-friendly buttons and write a short description for each. The manual ID field remains available as an advanced fallback.
 - Markdown preview and a one-step restore of prior settings.
 - Filter private, draft, password-protected and common noindex content.
 - Serve **/llms.txt** through WordPress rewrite, with short-lived caching and cache invalidation after content updates.
@@ -37,6 +37,10 @@ php tests/portable.php
 ```
 
 CI also runs WordPress Plugin Check and an HTTP smoke test against a disposable WordPress instance. See [the v1.3 LAB acceptance checklist](docs/LAB-QA-v1.3.0-beta.1.md) before staging or distributing the beta. See [ROADMAP.md](ROADMAP.md) for remaining work and [SECURITY.md](SECURITY.md) for reporting.
+
+### v2.0 alpha upgrade behavior
+
+Version 2.0 keeps `llms_txt_composer_settings`, the ordered `highlight_ids` field and all existing editor modes. The new optional `featured_descriptions` map only adds text next to valid published featured links. Existing v1.3 sites require no destructive migration or database rename. Do not enable the alpha outside LAB before testing the save, preview and restore cycle.
 
 ### Rename and safe migration from Amino LLMS 1.2.1
 

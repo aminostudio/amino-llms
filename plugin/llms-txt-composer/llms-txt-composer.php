@@ -3,7 +3,7 @@
  * Plugin Name: LLMs.txt Composer
  * Plugin URI: https://github.com/aminostudio/llms-txt-composer
  * Description: An editorial llms.txt for WordPress, with automatic, manual and hybrid modes.
- * Version: 1.3.0-beta.1
+ * Version: 2.0.0-alpha.1
  * Requires at least: 6.4
  * Requires PHP: 8.0
  * Author: Amino Studio
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
  * Legacy site-specific v1.1 lives in a different directory and is not modified.
  */
 final class Amino_LLMS {
-    private const VERSION = '1.3.0-beta.1';
+    private const VERSION = '2.0.0-alpha.1';
     private const OPTION = 'llms_txt_composer_settings';
     private const PREVIOUS = 'llms_txt_composer_previous_settings';
     private const CACHE = 'llms_txt_composer_document_cache';
@@ -99,6 +99,7 @@ final class Amino_LLMS {
             'post_types' => ['page', 'post'],
             'items_per_type' => 8,
             'highlight_ids' => '',
+            'featured_descriptions' => [],
         ];
     }
 
@@ -109,6 +110,7 @@ final class Amino_LLMS {
         }
         $s = array_merge(self::defaults(), $saved);
         $s['post_types'] = is_array($s['post_types']) ? $s['post_types'] : [];
+        $s['featured_descriptions'] = is_array($s['featured_descriptions']) ? $s['featured_descriptions'] : [];
         return $s;
     }
 
@@ -148,6 +150,22 @@ final class Amino_LLMS {
             }
         }
 
+        // Old highlight_ids remain the canonical ordered ID list. Notes are
+        // optional and are never stored for unselected IDs.
+        $raw_notes = isset($input['featured_descriptions']) && is_array($input['featured_descriptions'])
+            ? $input['featured_descriptions'] : [];
+        $featured_notes = [];
+        foreach (array_slice($ids, 0, 10) as $featured_id) {
+            $note = $raw_notes[(string) $featured_id] ?? '';
+            if (!is_string($note)) {
+                continue;
+            }
+            $note = self::limit(sanitize_text_field($note), 180);
+            if ($note !== '') {
+                $featured_notes[$featured_id] = $note;
+            }
+        }
+
         $name = is_string($input['site_name'] ?? null) ? $input['site_name'] : '';
         $summary = is_string($input['summary'] ?? null) ? $input['summary'] : '';
         $intro = is_string($input['introduction'] ?? null) ? $input['introduction'] : '';
@@ -165,6 +183,7 @@ final class Amino_LLMS {
             'post_types' => $selected,
             'items_per_type' => max(1, min(25, $item_limit)),
             'highlight_ids' => implode(',', array_slice($ids, 0, 10)),
+            'featured_descriptions' => $featured_notes,
         ];
     }
 
@@ -268,6 +287,12 @@ final class Amino_LLMS {
             }
             $row = self::link($post);
             if ($row !== '') {
+                $raw_note = $s['featured_descriptions'][$post->ID] ?? '';
+                if (is_string($raw_note) && trim($raw_note) !== '') {
+                    // Escape Markdown link delimiters and normalize text even
+                    // when a filter provides untrusted legacy option values.
+                    $row .= ': ' . self::md_label(self::limit($raw_note, 180));
+                }
                 $featured[] = $row;
                 $seen[$post->ID] = true;
             }
@@ -397,6 +422,9 @@ final class Amino_LLMS {
                 'limit' => __('You can feature up to 10 items.', 'llms-txt-composer'),
                 'failed' => __('Search could not be completed. Try again.', 'llms-txt-composer'),
                 'remove' => __('Remove', 'llms-txt-composer'),
+                'moveUp' => __('Move up', 'llms-txt-composer'),
+                'moveDown' => __('Move down', 'llms-txt-composer'),
+                'note' => __('Editorial description', 'llms-txt-composer'),
                 'min' => __('Enter at least two characters to search.', 'llms-txt-composer'),
             ]);
         }
@@ -580,8 +608,16 @@ final class Amino_LLMS {
                 continue;
             }
             $label = (string) get_the_title($featured_post);
-            // translators: %s: title of the published post or page removed from featured items.
-            echo '<li data-featured-id="' . esc_attr((string) $featured_post->ID) . '"><span>' . esc_html($label) . '</span> <button type="button" data-featured-remove class="button-link" aria-label="' . esc_attr(sprintf(__('Remove %s', 'llms-txt-composer'), $label)) . '">' . esc_html__('Remove', 'llms-txt-composer') . '</button></li>';
+            $featured_id = (int) $featured_post->ID;
+            $note = $s['featured_descriptions'][$featured_id] ?? '';
+            $note = is_string($note) ? $note : '';
+            echo '<li data-featured-id="' . esc_attr((string) $featured_id) . '"><strong class="llms-featured-title">' . esc_html($label) . '</strong>';
+            echo '<label>' . esc_html__('Editorial description', 'llms-txt-composer') . ' <span class="screen-reader-text">' . esc_html($label) . '</span><input type="text" maxlength="180" class="widefat" name="amino_llms[featured_descriptions][' . esc_attr((string) $featured_id) . ']" value="' . esc_attr($note) . '"></label>';
+            echo '<div class="llms-featured-actions">';
+            echo '<button type="button" data-featured-up class="button-link" aria-label="' . esc_attr(__('Move up', 'llms-txt-composer') . ': ' . $label) . '">' . esc_html__('Up', 'llms-txt-composer') . '</button>';
+            echo '<button type="button" data-featured-down class="button-link" aria-label="' . esc_attr(__('Move down', 'llms-txt-composer') . ': ' . $label) . '">' . esc_html__('Down', 'llms-txt-composer') . '</button>';
+            echo '<button type="button" data-featured-remove class="button-link" aria-label="' . esc_attr(__('Remove', 'llms-txt-composer') . ': ' . $label) . '">' . esc_html__('Remove', 'llms-txt-composer') . '</button>';
+            echo '</div></li>';
         }
         echo '</ul><details class="llms-txt-composer-advanced"><summary>' . esc_html__('Advanced: edit post IDs manually', 'llms-txt-composer') . '</summary>';
         echo '<p><label for="al-high">' . esc_html__('Featured post IDs (comma-separated)', 'llms-txt-composer') . '</label><input class="widefat" id="al-high" name="amino_llms[highlight_ids]" value="' . esc_attr((string) $s['highlight_ids']) . '"></p></details></div></div>';
