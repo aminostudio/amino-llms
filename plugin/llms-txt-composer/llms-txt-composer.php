@@ -38,6 +38,7 @@ final class Amino_LLMS {
         add_action('admin_post_amino_llms_save', [__CLASS__, 'save_settings']);
         add_action('admin_post_amino_llms_restore', [__CLASS__, 'restore_settings']);
         add_action('wp_ajax_amino_llms_find_posts', [__CLASS__, 'ajax_find_posts']);
+        add_action('wp_ajax_amino_llms_probe', [__CLASS__, 'ajax_probe']);
         add_action('save_post', [__CLASS__, 'invalidate']);
         add_action('deleted_post', [__CLASS__, 'invalidate']);
         add_action('trashed_post', [__CLASS__, 'invalidate']);
@@ -384,12 +385,14 @@ final class Amino_LLMS {
             header('Content-Type: text/plain; charset=UTF-8');
             header('X-Content-Type-Options: nosniff');
             header('Cache-Control: no-store');
+            header('X-LLMs-Txt-Composer: ' . self::VERSION);
             echo 'llms.txt is not configured yet.';
             exit;
         }
         status_header(200);
         header('Content-Type: text/plain; charset=UTF-8');
         header('X-Content-Type-Options: nosniff');
+        header('X-LLMs-Txt-Composer: ' . self::VERSION);
         // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- This endpoint is text/plain Markdown, not HTML; escaping changes link syntax.
         echo $document;
         exit;
@@ -404,6 +407,62 @@ final class Amino_LLMS {
         ];
     }
 
+    /**
+     * Categorize the public response without exposing its body to administrators.
+     * A Composer header distinguishes its output from static files, CDNs and
+     * Under Construction / maintenance pages.
+     */
+    public static function assess_public_response($response): array {
+        if (is_wp_error($response)) {
+            return [
+                'state' => 'unreachable',
+                'status' => 0,
+                'mime' => '',
+                'message' => __('The public URL could not be reached from WordPress. Check loopback access and firewalls.', 'llms-txt-composer'),
+            ];
+        }
+        $status = (int) wp_remote_retrieve_response_code($response);
+        $content_type = strtolower(trim((string) wp_remote_retrieve_header($response, 'content-type')));
+        $mime = trim(explode(';', $content_type, 2)[0]);
+        $signature = trim((string) wp_remote_retrieve_header($response, 'x-llms-txt-composer'));
+        $body = (string) wp_remote_retrieve_body($response);
+        if ($signature === self::VERSION && $status === 200 && $mime === 'text/plain' &&
+            preg_match('/\\A#[ \\t]+\\S/u', $body) === 1) {
+            $state = 'verified';
+            $message = __('Composer serves public plain-text Markdown at /llms.txt.', 'llms-txt-composer');
+        } elseif ($signature === self::VERSION) {
+            $state = 'invalid';
+            $message = __('Composer answered, but the public document is invalid. Review its saved content.', 'llms-txt-composer');
+        } else {
+            $state = 'intercepted';
+            $message = __('Another response intercepts /llms.txt. Check maintenance mode, static files, caches and routing.', 'llms-txt-composer');
+        }
+        return ['state' => $state, 'status' => $status, 'mime' => $mime, 'message' => $message];
+    }
+
+    /** On-demand, bounded anonymous loopback to the site's own public URL. */
+    public static function probe_public_endpoint(): array {
+        $response = wp_safe_remote_get(home_url('/llms.txt'), [
+            'timeout' => 5,
+            'redirection' => 0,
+            'limit_response_size' => 4096,
+            'headers' => ['Accept' => 'text/plain'],
+        ]);
+        return self::assess_public_response($response);
+    }
+
+    public static function ajax_probe(): void {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'Forbidden'], 403);
+            return;
+        }
+        if (false === check_ajax_referer('amino_llms_public_probe', 'nonce', false)) {
+            wp_send_json_error(['message' => 'Invalid nonce'], 403);
+            return;
+        }
+        wp_send_json_success(self::probe_public_endpoint());
+    }
+
     public static function admin_menu(): void {
         add_options_page('LLMs.txt Composer', 'LLMs.txt Composer', 'manage_options', 'llms-txt-composer', [__CLASS__, 'admin_page']);
     }
@@ -415,6 +474,9 @@ final class Amino_LLMS {
             wp_localize_script('llms-txt-composer-admin', 'llmsComposerSearch', [
                 'ajaxUrl' => admin_url('admin-ajax.php'),
                 'nonce' => wp_create_nonce('amino_llms_featured_search'),
+                'probeNonce' => wp_create_nonce('amino_llms_public_probe'),
+                'probing' => __('Checking the public response…', 'llms-txt-composer'),
+                'probeFailed' => __('Could not complete the verification request.', 'llms-txt-composer'),
                 'searching' => __('Searching published content…', 'llms-txt-composer'),
                 'none' => __('No eligible public content found.', 'llms-txt-composer'),
                 'choose' => __('Select a result to feature it.', 'llms-txt-composer'),
@@ -576,6 +638,8 @@ final class Amino_LLMS {
             echo '<li class="' . esc_attr($okay ? 'llms-txt-composer-check--ok' : 'llms-txt-composer-check--warn') . '"><strong>' . esc_html($copy[0]) . '</strong><span>' . esc_html($okay ? $copy[1] : $copy[2]) . '</span></li>';
         }
         echo '</ul><p class="description">' . esc_html__('Local checks cannot confirm web server or CDN routing. Always open the public document and inspect its response.', 'llms-txt-composer') . '</p></section>';
+        echo '<div class="llms-composer-live-probe"><button type="button" id="al-verify-public-route" class="button button-secondary">' . esc_html__('Verify actual public /llms.txt', 'llms-txt-composer') . '</button>';
+        echo '<p id="al-public-probe-status" aria-live="polite" role="status" class="description">' . esc_html__('Not checked yet. This tests the public URL without administrator cookies.', 'llms-txt-composer') . '</p></div>';
         echo '<div class="llms-txt-composer-meta"><span>' . esc_html__('Delivery:', 'llms-txt-composer') . ' <strong>' . esc_html__('Virtual /llms.txt', 'llms-txt-composer') . '</strong></span><span>' . esc_html__('Mode:', 'llms-txt-composer') . ' <strong>' . esc_html(ucfirst((string) $s['mode'])) . '</strong></span><span>v' . esc_html(self::VERSION) . '</span></div>';
         echo '<div class="llms-txt-composer-grid"><div class="llms-txt-composer-panel"><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="amino_llms_save">';
         wp_nonce_field('amino_llms_save');
