@@ -10,3 +10,13 @@
 .llms-txt-composer-advanced summary{cursor:pointer}
 
 .llms-txt-composer-admin [data-mode-show][hidden]{display:none!important}
+
+.llms-txt-composer-diagnostics{margin:12px 0 20px;padding:14px 18px;background:#fff;border:1px solid #ded9ec;border-radius:12px}
+.llms-txt-composer-diagnostics h2{margin:0 0 12px;font-size:16px;color:#292040}
+.llms-txt-composer-diagnostics ul{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0;padding:0;list-style:none}
+.llms-txt-composer-diagnostics li{border-left:3px solid #117c5f;padding:7px 10px;margin:0;background:#f5faf7}
+.llms-txt-composer-diagnostics li.llms-txt-composer-check--warn{border-left-color:#9a6315;background:#fff9ee}
+.llms-txt-composer-diagnostics li strong{display:block;margin-bottom:4px}
+.llms-txt-composer-diagnostics li span{display:block;line-height:1.5}
+.llms-txt-composer-diagnostics .description{margin:12px 0 0}
+@media(max-width:850px){.llms-txt-composer-diagnostics ul{grid-template-columns:1fr}}
