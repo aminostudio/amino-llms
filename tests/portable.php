@@ -170,7 +170,7 @@ unset($_POST['amino_llms']);
 
 $public_ok = [
     'response' => ['code' => 200],
-    'headers' => ['content-type' => 'text/plain; charset=UTF-8', 'x-llms-txt-composer' => '2.0.0-alpha.1'],
+    'headers' => ['content-type' => 'text/plain; charset=UTF-8', 'x-llms-txt-composer' => '2.0.0-alpha.2'],
     'body' => "# LAB Preview\n\n## Main Pages\n",
 ];
 check(Amino_LLMS::assess_public_response($public_ok)['state'] === 'verified', 'Live probe confirms its own signed Markdown HTTP response');
