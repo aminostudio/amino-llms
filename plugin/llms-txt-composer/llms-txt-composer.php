@@ -3,7 +3,7 @@
  * Plugin Name: LLMs.txt Composer
  * Plugin URI: https://github.com/aminostudio/llms-txt-composer
  * Description: An editorial llms.txt for WordPress, with automatic, manual and hybrid modes.
- * Version: 2.0.0-alpha.1
+ * Version: 2.0.0-alpha.2
  * Requires at least: 6.4
  * Requires PHP: 8.0
  * Author: Amino Studio
@@ -22,7 +22,7 @@ if (!defined('ABSPATH')) {
  * Legacy site-specific v1.1 lives in a different directory and is not modified.
  */
 final class Amino_LLMS {
-    private const VERSION = '2.0.0-alpha.1';
+    private const VERSION = '2.0.0-alpha.2';
     private const OPTION = 'llms_txt_composer_settings';
     private const PREVIOUS = 'llms_txt_composer_previous_settings';
     private const CACHE = 'llms_txt_composer_document_cache';
@@ -39,6 +39,7 @@ final class Amino_LLMS {
         add_action('admin_post_amino_llms_restore', [__CLASS__, 'restore_settings']);
         add_action('wp_ajax_amino_llms_find_posts', [__CLASS__, 'ajax_find_posts']);
         add_action('wp_ajax_amino_llms_probe', [__CLASS__, 'ajax_probe']);
+        add_action('wp_ajax_amino_llms_preview_draft', [__CLASS__, 'ajax_preview_draft']);
         add_action('save_post', [__CLASS__, 'invalidate']);
         add_action('deleted_post', [__CLASS__, 'invalidate']);
         add_action('trashed_post', [__CLASS__, 'invalidate']);
@@ -475,6 +476,12 @@ final class Amino_LLMS {
                 'ajaxUrl' => admin_url('admin-ajax.php'),
                 'nonce' => wp_create_nonce('amino_llms_featured_search'),
                 'probeNonce' => wp_create_nonce('amino_llms_public_probe'),
+                'previewNonce' => wp_create_nonce('amino_llms_preview_draft'),
+                'previewing' => __('Preparing unsaved preview…', 'llms-txt-composer'),
+                'previewReady' => __('Unsaved preview. The public document has not changed.', 'llms-txt-composer'),
+                'previewInvalid' => __('Invalid draft. Start with a # heading and keep the document below 128 KiB.', 'llms-txt-composer'),
+                'previewFailed' => __('Preview failed. Existing public settings are unchanged.', 'llms-txt-composer'),
+                'previewDirty' => __('You have unsaved edits. Preview again to see the latest draft.', 'llms-txt-composer'),
                 'probing' => __('Checking the public response…', 'llms-txt-composer'),
                 'probeFailed' => __('Could not complete the verification request.', 'llms-txt-composer'),
                 'searching' => __('Searching published content…', 'llms-txt-composer'),
@@ -557,6 +564,37 @@ final class Amino_LLMS {
         // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Sanitized and length-limited in find_featured_posts().
         $term = isset($_GET['q']) && is_string($_GET['q']) ? wp_unslash($_GET['q']) : '';
         wp_send_json_success(self::find_featured_posts($term));
+    }
+
+
+    /**
+     * Render a sanitized form draft without changing options, transients
+     * or the public URL. Only published, eligible links are ever included.
+     */
+    public static function draft_preview(array $input): array {
+        $clean = self::clean_settings($input);
+        $document = self::render($clean);
+        return [
+            'valid' => self::valid_document($document),
+            'document' => $document,
+            'bytes' => strlen($document),
+        ];
+    }
+
+    /** Explicit, administrator-only unsaved Markdown preview. */
+    public static function ajax_preview_draft(): void {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'Forbidden'], 403);
+            return;
+        }
+        if (false === check_ajax_referer('amino_llms_preview_draft', 'nonce', false)) {
+            wp_send_json_error(['message' => 'Invalid nonce'], 403);
+            return;
+        }
+        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- All form fields are sanitized by clean_settings() before use.
+        $input = isset($_POST['amino_llms']) && is_array($_POST['amino_llms'])
+            ? wp_unslash($_POST['amino_llms']) : [];
+        wp_send_json_success(self::draft_preview($input));
     }
 
     private static function authorize(): void {
@@ -685,6 +723,7 @@ final class Amino_LLMS {
         }
         echo '</ul><details class="llms-txt-composer-advanced"><summary>' . esc_html__('Advanced: edit post IDs manually', 'llms-txt-composer') . '</summary>';
         echo '<p><label for="al-high">' . esc_html__('Featured post IDs (comma-separated)', 'llms-txt-composer') . '</label><input class="widefat" id="al-high" name="amino_llms[highlight_ids]" value="' . esc_attr((string) $s['highlight_ids']) . '"></p></details></div></div>';
+        echo '<p><button type="button" id="al-preview-draft" class="button button-secondary">' . esc_html__('Preview unsaved changes', 'llms-txt-composer') . '</button></p>';
         submit_button(__('Save and update llms.txt', 'llms-txt-composer'));
         echo '</form>';
         if (is_array(get_option(self::PREVIOUS, null))) {
@@ -694,8 +733,9 @@ final class Amino_LLMS {
             echo '</form>';
         }
         echo '</div><div class="llms-txt-composer-panel"><h2>' . esc_html__('Markdown preview', 'llms-txt-composer') . '</h2><p>' . esc_html__('Preview of your last saved settings. Save changes to update the public endpoint.', 'llms-txt-composer') . '</p>';
-        echo '<textarea class="widefat llms-txt-composer-mono" rows="24" readonly aria-label="' . esc_attr__('Markdown preview', 'llms-txt-composer') . '">' . esc_textarea($preview) . '</textarea>';
-        echo '<p class="description">' . esc_html(number_format_i18n(strlen($preview))) . ' bytes · <a href="' . esc_url(home_url('/llms.txt')) . '" target="_blank" rel="noopener noreferrer">' . esc_html__('View public llms.txt', 'llms-txt-composer') . '</a></p>';
+        echo '<p id="al-preview-message" class="description" role="status" aria-live="polite">' . esc_html__('Showing last saved settings; use Preview unsaved changes to inspect edits safely.', 'llms-txt-composer') . '</p>';
+        echo '<textarea id="al-markdown-preview" class="widefat llms-txt-composer-mono" rows="24" readonly aria-label="' . esc_attr__('Markdown preview', 'llms-txt-composer') . '">' . esc_textarea($preview) . '</textarea>';
+        echo '<p class="description"><span id="al-preview-bytes">' . esc_html(number_format_i18n(strlen($preview))) . '</span> bytes · <a href="' . esc_url(home_url('/llms.txt')) . '" target="_blank" rel="noopener noreferrer">' . esc_html__('View public llms.txt', 'llms-txt-composer') . '</a></p>';
         echo '<p class="description">' . esc_html__('llms.txt is a discovery format, not a guarantee of AI indexing or citations.', 'llms-txt-composer') . '</p></div></div></div>';
     }
 }

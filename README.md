@@ -4,7 +4,7 @@
 
 **Your website, clearly understood.**
 
-**v2.0.0-alpha.1** introduces ordered editorial highlights with optional per-link descriptions. Existing v1.3 settings are retained. This is an experimental LAB candidate, not a public stable release.
+**v2.0.0-alpha.2** adds unsaved Markdown preview and validation to the v2 ordered editorial highlights. Existing v1.3 settings are retained. This is an experimental LAB candidate, not a public stable release.
 
 LLMs.txt Composer is an independent, lightweight WordPress plugin for publishing a human-guided `llms.txt` in Markdown. **Automatic, Manual, and Hybrid** modes let site owners explain what matters rather than dumping a complete XML sitemap.
 
@@ -16,7 +16,7 @@ LLMs.txt Composer is an independent, lightweight WordPress plugin for publishing
 - Manual mode: complete Markdown authoring in the WordPress admin.
 - Hybrid mode: editorial introduction plus automatically generated links.
 - Select public WordPress post types and a link limit; search published content by title to add featured links (up to 10), reorder with keyboard-friendly buttons and write a short description for each. The manual ID field remains available as an advanced fallback.
-- Markdown preview and a one-step restore of prior settings.
+- Preview saved Markdown, test unsaved changes without touching public output, and restore prior settings in one step.
 - Filter private, draft, password-protected and common noindex content.
 - Serve **/llms.txt** through WordPress rewrite, with short-lived caching and cache invalidation after content updates.
 - Show local delivery diagnostics for Markdown validity, pretty permalinks and physical `llms.txt` file conflicts. A separate administrator-only HTTP probe can detect an actual HTML maintenance page or another route provider.
