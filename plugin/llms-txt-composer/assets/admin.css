@@ -28,3 +28,11 @@
 .llms-txt-composer-selected label input{font-weight:400;margin-top:4px;max-width:100%}
 .llms-featured-actions{display:flex;gap:14px;flex-wrap:wrap}
 .llms-featured-actions .button-link{min-height:32px}
+
+/* Optional real HTTP probe: distinguish verified output from interception. */
+.llms-composer-live-probe{margin:-8px 0 18px;padding:12px 18px;border:1px solid #ded9ec;background:#fff;border-radius:8px}
+.llms-composer-live-probe p{margin:8px 0 0}
+#al-public-probe-status[data-state="verified"]{color:#117c5f}
+#al-public-probe-status[data-state="intercepted"],
+#al-public-probe-status[data-state="invalid"],
+#al-public-probe-status[data-state="unreachable"]{color:#8e5213}
