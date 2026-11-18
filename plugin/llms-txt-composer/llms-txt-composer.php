@@ -337,6 +337,8 @@ final class Amino_LLMS {
         if (!self::valid_document($document)) {
             status_header(503);
             header('Content-Type: text/plain; charset=UTF-8');
+            header('X-Content-Type-Options: nosniff');
+            header('Cache-Control: no-store');
             echo 'llms.txt is not configured yet.';
             exit;
         }
@@ -346,6 +348,15 @@ final class Amino_LLMS {
         // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- This endpoint is text/plain Markdown, not HTML; escaping changes link syntax.
         echo $document;
         exit;
+    }
+
+    /** Local checks never claim to inspect the server or CDN route. */
+    public static function delivery_diagnostics(string $document, bool $static_file, bool $pretty_urls): array {
+        return [
+            'markdown' => self::valid_document($document),
+            'permalinks' => $pretty_urls,
+            'root_file' => !$static_file,
+        ];
     }
 
     public static function admin_menu(): void {
@@ -485,12 +496,30 @@ final class Amino_LLMS {
             $okay = in_array($notice, ['saved', 'restored'], true);
             echo '<div class="notice notice-' . esc_attr($okay ? 'success' : 'error') . '"><p>' . esc_html($notice === 'invalid' ? 'A valid document needs a # heading and must be smaller than 128 KiB.' : ucfirst($notice)) . '</p></div>';
         }
-        if ($static_file) {
-            echo '<div class="notice notice-warning"><p>' . esc_html__('An existing physical llms.txt was detected. Your web server may serve that file instead of the virtual document. Import its contents manually before renaming or removing it. This plugin never deletes or overwrites that file.', 'llms-txt-composer') . '</p></div>';
+        $checks = self::delivery_diagnostics($preview, $static_file, (string) get_option('permalink_structure', '') !== '');
+        $check_copy = [
+            'markdown' => [
+                __('Markdown document', 'llms-txt-composer'),
+                __('The saved Markdown is well-formed and within the 128 KiB limit.', 'llms-txt-composer'),
+                __('Begin with a # heading and keep the document below 128 KiB.', 'llms-txt-composer'),
+            ],
+            'permalinks' => [
+                __('Permalink structure', 'llms-txt-composer'),
+                __('Pretty permalinks are configured. Verify /llms.txt on the actual server.', 'llms-txt-composer'),
+                __('Enable pretty permalinks, then verify /llms.txt on the actual server.', 'llms-txt-composer'),
+            ],
+            'root_file' => [
+                __('Physical file conflict', 'llms-txt-composer'),
+                __('No competing file was found in the WordPress installation root.', 'llms-txt-composer'),
+                __('A physical llms.txt exists. Back it up before any manual move; this plugin never overwrites it.', 'llms-txt-composer'),
+            ],
+        ];
+        echo '<section class="llms-txt-composer-diagnostics" aria-labelledby="llms-composer-diagnostics-heading"><h2 id="llms-composer-diagnostics-heading">' . esc_html__('Delivery diagnostics', 'llms-txt-composer') . '</h2><ul>';
+        foreach ($checks as $code => $okay) {
+            $copy = $check_copy[$code];
+            echo '<li class="' . esc_attr($okay ? 'llms-txt-composer-check--ok' : 'llms-txt-composer-check--warn') . '"><strong>' . esc_html($copy[0]) . '</strong><span>' . esc_html($okay ? $copy[1] : $copy[2]) . '</span></li>';
         }
-        if ((string) get_option('permalink_structure', '') === '') {
-            echo '<div class="notice notice-warning"><p>' . esc_html__('Pretty permalinks appear to be disabled. A virtual /llms.txt depends on WordPress rewrite rules and may not resolve on this server. Enable permalinks and test the public URL.', 'llms-txt-composer') . '</p></div>';
-        }
+        echo '</ul><p class="description">' . esc_html__('Local checks cannot confirm web server or CDN routing. Always open the public document and inspect its response.', 'llms-txt-composer') . '</p></section>';
         echo '<div class="llms-txt-composer-meta"><span>' . esc_html__('Delivery:', 'llms-txt-composer') . ' <strong>' . esc_html__('Virtual /llms.txt', 'llms-txt-composer') . '</strong></span><span>' . esc_html__('Mode:', 'llms-txt-composer') . ' <strong>' . esc_html(ucfirst((string) $s['mode'])) . '</strong></span><span>v' . esc_html(self::VERSION) . '</span></div>';
         echo '<div class="llms-txt-composer-grid"><div class="llms-txt-composer-panel"><form method="post" action="' . esc_url(admin_url('admin-post.php')) . '"><input type="hidden" name="action" value="amino_llms_save">';
         wp_nonce_field('amino_llms_save');

@@ -40,6 +40,8 @@ jobs:
           curl --silent --show-error -D /tmp/amino-invalid-headers.txt http://localhost:8880/llms.txt -o /tmp/amino-invalid.txt
           grep -Eq '^HTTP/[0-9.]+ 503' /tmp/amino-invalid-headers.txt
           grep -qi '^content-type: text/plain' /tmp/amino-invalid-headers.txt
+          grep -qi '^x-content-type-options: nosniff' /tmp/amino-invalid-headers.txt
+          grep -qi '^cache-control: no-store' /tmp/amino-invalid-headers.txt
           grep -qx 'llms.txt is not configured yet.' /tmp/amino-invalid.txt
           echo "HTTP success headers and invalid-document fail-closed contract passed."
           # Test the actual public endpoint in all three modes.

@@ -124,6 +124,14 @@ check(in_array('amino_llms_document', Amino_LLMS::query_vars([]), true), 'Public
 $defaults = Amino_LLMS::defaults();
 check($defaults['mode'] === 'hybrid', 'Hybrid is the default');
 check($defaults['post_types'] === ['page', 'post'], 'Pages and posts are included by default');
+check(
+    Amino_LLMS::delivery_diagnostics("# Ready\n", false, true) === ['markdown' => true, 'permalinks' => true, 'root_file' => true],
+    'Delivery checks accept valid Markdown, pretty permalinks and no physical-file conflict'
+);
+check(
+    Amino_LLMS::delivery_diagnostics('Invalid without heading', true, false) === ['markdown' => false, 'permalinks' => false, 'root_file' => false],
+    'Delivery checks flag invalid, plain-permalink and physical-file conflict states'
+);
 
 $matches = Amino_LLMS::find_featured_posts('technology');
 check(count($matches) === 1 && $matches[0]['id'] === 7 && $matches[0]['type'] === 'Books', 'Editor search finds public CPT by title');
