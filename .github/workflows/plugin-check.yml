@@ -34,6 +34,7 @@ jobs:
           # Assert the public HTTP contract, not just PHP rendering.
           grep -Eq '^HTTP/[0-9.]+ 200' /tmp/amino-headers.txt
           grep -qi '^x-content-type-options: nosniff' /tmp/amino-headers.txt
+          grep -qi '^x-llms-txt-composer: 2.0.0-alpha.1' /tmp/amino-headers.txt
           ! grep -qi '^content-type: text/html' /tmp/amino-headers.txt
           # Invalid manual configuration must fail closed, never serve an empty document.
           wp-env run cli wp eval '$s = Amino_LLMS::settings(); $s["mode"] = "manual"; $s["manual_markdown"] = "Invalid document without Markdown heading"; update_option("llms_txt_composer_settings", $s, false); Amino_LLMS::invalidate();'
@@ -42,6 +43,7 @@ jobs:
           grep -qi '^content-type: text/plain' /tmp/amino-invalid-headers.txt
           grep -qi '^x-content-type-options: nosniff' /tmp/amino-invalid-headers.txt
           grep -qi '^cache-control: no-store' /tmp/amino-invalid-headers.txt
+          grep -qi '^x-llms-txt-composer: 2.0.0-alpha.1' /tmp/amino-invalid-headers.txt
           grep -qx 'llms.txt is not configured yet.' /tmp/amino-invalid.txt
           echo "HTTP success headers and invalid-document fail-closed contract passed."
           # Test the actual public endpoint in all three modes.
