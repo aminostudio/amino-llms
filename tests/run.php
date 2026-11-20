@@ -109,11 +109,11 @@ $with_old=str_replace('## Marseille, France and International Work', '<!-- AMINO
 $path=$dir.'llms.txt';file_put_contents($path,$with_old);
 yes(Amino_Dynamic_LLMS::refresh(),'First refresh from v1.0 succeeds');
 $doc=file_get_contents($path);
-yes(count_matches($doc,'[ACTA — Editorial Journal](https://aminostudio.fr/chroniques/)')===1,'ACTA appears once in Main Pages');
+yes(count_matches($doc,'[ACTA — Journal éditorial](https://aminostudio.fr/acta/)')===1,'ACTA appears once in Main Pages');
 yes(count_matches($doc,'[Contact](https://aminostudio.fr/contact/)')===1,'Contact is linked exactly once');
-yes(count_matches($doc,'[Spaces Projects](https://aminostudio.fr/project-category/spaces/)')===1,'Spaces category added once');
-yes(count_matches($doc,'## Selected Spaces Projects')===1,'Spaces projects section added once');
-yes(str_contains($doc,'[Ziryab 1.0 — Al-Ándalus CS]') && str_contains($doc,'[Ziryab 2.0 — Al-Ándalus CS]'),'Both spatial projects linked with their client');
+yes(count_matches($doc,'[Projets Spaces](https://aminostudio.fr/project-category/spaces/)')===1,'Spaces category added once');
+yes(count_matches($doc,'## Projets Spaces sélectionnés')===1,'Spaces projects section added once');
+yes(str_contains($doc,'[Ziryab 1.0 — Al-Ándalus CS]') && str_contains($doc,'[Ziryab 1.2 — Al-Ándalus CS]'),'Both spatial projects linked with their client');
 yes(count_matches($doc,'## Main Pages')===1 && str_contains($doc,'- [Lab]('),'Original editorial content preserved');
 yes(!str_contains($doc,'## Other Site Resources'),'Redundant resources section removed');
 yes(count_matches($doc,'[Nvidia : derrière l’empire]')===1,'Highlights do not duplicate Latest');
@@ -139,19 +139,36 @@ yes(file_get_contents($path)===$bad2,'Missing heading error never changes the fi
 file_put_contents($path,$with_old);
 $GLOBALS['options']['amino_llms_plugin_version']='1.0.0';
 Amino_Dynamic_LLMS::maybe_upgrade();
-yes(get_option('amino_llms_plugin_version')==='1.1.0','Automatic version migration on next WordPress init');
+yes(get_option('amino_llms_plugin_version')==='1.2.0','Automatic version migration on next WordPress init');
 yes(get_option('amino_llms_highlighted_ids')==='90379,90384,90379,0','Editor-selected IDs preserved by upgrade');
 yes(isset($GLOBALS['schedule']['amino_llms_refresh']),'Hourly cron scheduled');
-yes(str_contains(file_get_contents($path),'## Selected Spaces Projects'),'Upgrade rewrites llms.txt with new sections');
+yes(str_contains(file_get_contents($path),'## Projets Spaces sélectionnés'),'Upgrade rewrites llms.txt with new sections');
 yes(get_option('amino_llms_highlight_mode')==='manual','v1.0 curated highlights retain manual mode');
 $GLOBALS['options']['amino_llms_highlight_mode']='auto';
 yes(Amino_Dynamic_LLMS::refresh(),'Automatic highlight mode generates without configured IDs');
 $auto=file_get_contents($path);
-$start=strpos($auto, '### Highlighted ACTA Articles');
-$end=strpos($auto, '### Latest ACTA Articles');
+$start=strpos($auto, '### Articles ACTA à la une');
+$end=strpos($auto, '### Derniers articles ACTA');
 $featured=substr($auto,$start,$end-$start);
 yes(str_contains($featured, '[Nvidia : derrière l’empire]') && str_contains($featured, '[Cyberpunk d’Asma Mhalla]') && str_contains($featured, '[Quand Internet s’éteint]'),'Auto mode selects the three newest published posts');
 yes(count_matches($auto,'[Quand Internet s’éteint]')===1,'Auto highlighted articles excluded from recent list');
+// TRUE FRENCH: an existing French editorial document must be accepted and never overwritten outside markers.
+$french=str_replace(
+    ['## Main Pages','## Project Categories','## Marseille, France and International Work'],
+    ['## Pages principales','## Catégories de projets','## Marseille, France et collaborations internationales'],
+    $base
+);
+file_put_contents($path,$french);
+yes(Amino_Dynamic_LLMS::refresh(),'French source refresh succeeds');
+$frDoc=file_get_contents($path);
+yes(str_contains($frDoc,'## Pages principales') && str_contains($frDoc,'## Catégories de projets'),'French static headings remain intact');
+yes(str_contains($frDoc,'### Articles ACTA à la une') && str_contains($frDoc,'### Derniers articles ACTA'),'French dynamic ACTA headings generated');
+yes(str_contains($frDoc,'## Projets du portfolio récemment mis à jour'),'French dynamic portfolio heading generated');
+yes(!str_contains($frDoc,'## Main Pages') && !str_contains($frDoc,'### Latest ACTA Articles'),'English headings are not reintroduced');
+$beforeDynamic=preg_replace('/<!-- AMINO-DYNAMIC:START -->.*?<!-- AMINO-DYNAMIC:END -->/s','<DYNAMIC>',$frDoc);
+yes(Amino_Dynamic_LLMS::refresh(),'French document second refresh succeeds');
+$afterDynamic=preg_replace('/<!-- AMINO-DYNAMIC:START -->.*?<!-- AMINO-DYNAMIC:END -->/s','<DYNAMIC>',file_get_contents($path));
+yes($beforeDynamic===$afterDynamic,'French editorial sections survive repeated refresh');
 // No write when llms file is a symlink.
 @unlink($path);file_put_contents($dir.'target.txt',$base);symlink($dir.'target.txt',$path);
 yes(!Amino_Dynamic_LLMS::refresh(),'Symlink rejected');
