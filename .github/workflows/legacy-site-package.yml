@@ -1,0 +1,45 @@
+name: Package site-specific Dynamic llms.txt maintenance ZIP
+on:
+  pull_request:
+    paths:
+      - 'plugin/amino-llms-dynamic/**'
+      - '.github/workflows/legacy-site-package.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  legacy-zip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint and check version/header
+        shell: bash
+        run: |
+          set -euo pipefail
+          PLUGIN=plugin/amino-llms-dynamic/amino-llms-dynamic.php
+          php -l "$PLUGIN"
+          grep -Fq ' * Version: 1.1.1' "$PLUGIN"
+          grep -Fq "private const VERSION = '1.1.1';" "$PLUGIN"
+          grep -Fq ' * Author URI: https://profiles.wordpress.org/aminogfx/' "$PLUGIN"
+          grep -Fq "home_url('/acta/')" "$PLUGIN"
+          if grep -Fq "home_url('/chroniques/')" "$PLUGIN"; then
+            echo 'Legacy ACTA link remains.' >&2
+            exit 1
+          fi
+      - name: Create safe in-place update ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/amino-llms-dynamic
+          cp plugin/amino-llms-dynamic/amino-llms-dynamic.php dist/amino-llms-dynamic/
+          (cd dist && zip -qr amino-llms-dynamic-1.1.1.zip amino-llms-dynamic)
+          unzip -t dist/amino-llms-dynamic-1.1.1.zip
+          test "$(unzip -Z1 dist/amino-llms-dynamic-1.1.1.zip | grep -c '^amino-llms-dynamic/amino-llms-dynamic.php$')" -eq 1
+          sha256sum dist/amino-llms-dynamic-1.1.1.zip > dist/SHA256SUMS-legacy.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: amino-llms-dynamic-1.1.1-installable
+          path: |
+            dist/amino-llms-dynamic-1.1.1.zip
+            dist/SHA256SUMS-legacy.txt
+          if-no-files-found: error
