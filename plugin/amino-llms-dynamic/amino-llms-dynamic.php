@@ -2,10 +2,13 @@
 /**
  * Plugin Name: Amino Studio — Dynamic llms.txt
  * Description: Maintains an editorial llms.txt with ACTA highlights, recent articles and portfolio projects, independently of Yoast SEO.
- * Version: 1.1.0
+ * Plugin URI: https://github.com/aminostudio/llms-txt-composer/tree/main/plugin/amino-llms-dynamic
+ * Version: 1.1.1
  * Requires PHP: 8.0
  * Author: Amino Studio
+ * Author URI: https://profiles.wordpress.org/aminogfx/
  * License: GPL-2.0-or-later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: amino-llms-dynamic
  */
 
@@ -14,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 final class Amino_Dynamic_LLMS {
-    private const VERSION = '1.1.0';
+    private const VERSION = '1.1.1';
     private const CRON = 'amino_llms_refresh';
     private const START = '<!-- AMINO-DYNAMIC:START -->';
     private const END = '<!-- AMINO-DYNAMIC:END -->';
@@ -124,7 +127,7 @@ final class Amino_Dynamic_LLMS {
             '',
             'ACTA is Amino Studio’s independent French-language journal devoted to digital infrastructures, artificial intelligence, Big Tech, geopolitical power, cybersecurity, technological sovereignty and civil liberties. Its investigations and analyses are distinct from client portfolio work.',
             '',
-            '- [Explore the ACTA journal](' . home_url('/chroniques/') . ')',
+            '- [Explore the ACTA journal](' . home_url('/acta/') . ')',
             '',
             '### Highlighted ACTA Articles',
             '',
@@ -239,13 +242,13 @@ final class Amino_Dynamic_LLMS {
         }
 
         $main_text = $main[0];
-        if (!str_contains($main_text, home_url('/chroniques/'))) {
-            $line = '- [ACTA — Editorial Journal](' . home_url('/chroniques/') . '): Independent French-language journal covering digital power, AI, cybersecurity, infrastructure and civil liberties.';
+        if (!str_contains($main_text, home_url('/acta/'))) {
+            $line = '- [ACTA — Editorial Journal](' . home_url('/acta/') . '): Independent French-language journal covering digital power, AI, cybersecurity, infrastructure and civil liberties.';
             $main_text = self::insert_after_link($main_text, home_url('/lab/'), $line);
         }
         if (!str_contains($main_text, home_url('/contact/'))) {
             $line = '- [Contact](' . home_url('/contact/') . '): Contact details and enquiries for the studio.';
-            $main_text = self::insert_after_link($main_text, home_url('/chroniques/'), $line);
+            $main_text = self::insert_after_link($main_text, home_url('/acta/'), $line);
         }
         $document = self::replace_section($document, $main, $main_text);
 
