@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name: Amino Studio — Dynamic llms.txt
- * Description: Maintains an editorial llms.txt with ACTA highlights, recent articles and portfolio projects, independently of Yoast SEO.
+ * Plugin Name: Amino Studio — llms.txt dynamique
+ * Description: Publie un llms.txt éditorial en français avec la sélection ACTA, les derniers articles et les projets du portfolio, indépendamment de Yoast SEO.
  * Plugin URI: https://github.com/aminostudio/llms-txt-composer/tree/main/plugin/amino-llms-dynamic
- * Version: 1.1.1
+ * Version: 1.2.0
  * Requires PHP: 8.0
  * Author: Amino Studio
  * Author URI: https://profiles.wordpress.org/aminogfx/
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 final class Amino_Dynamic_LLMS {
-    private const VERSION = '1.1.1';
+    private const VERSION = '1.2.0';
     private const CRON = 'amino_llms_refresh';
     private const START = '<!-- AMINO-DYNAMIC:START -->';
     private const END = '<!-- AMINO-DYNAMIC:END -->';
@@ -123,13 +123,15 @@ final class Amino_Dynamic_LLMS {
         $out = [
             self::START,
             '',
-            '## ACTA — Independent Editorial Journal',
+            '## ACTA — Journal éditorial indépendant',
             '',
-            'ACTA is Amino Studio’s independent French-language journal devoted to digital infrastructures, artificial intelligence, Big Tech, geopolitical power, cybersecurity, technological sovereignty and civil liberties. Its investigations and analyses are distinct from client portfolio work.',
+            'ACTA est le journal indépendant francophone d’Amino Studio. Il explore les infrastructures numériques, l’intelligence artificielle, les grandes entreprises technologiques, le pouvoir géopolitique, la cybersécurité, la souveraineté technologique et les libertés publiques. Ses enquêtes et analyses sont distinctes des projets réalisés pour les clients du studio.',
             '',
-            '- [Explore the ACTA journal](' . home_url('/acta/') . ')',
+            'Auteur des articles : Amine Mechaï. Éditeur : Amino Studio.',
             '',
-            '### Highlighted ACTA Articles',
+            '- [Découvrir le journal ACTA](' . home_url('/acta/') . ')',
+            '',
+            '### Articles ACTA à la une',
             '',
         ];
 
@@ -160,13 +162,13 @@ final class Amino_Dynamic_LLMS {
             }
         }
         if (!$seen) {
-            $out[] = 'Explore the journal archive for current investigations and analysis.';
+            $out[] = 'Consulter les archives d’ACTA pour découvrir les enquêtes et analyses publiées.';
         }
 
         $out[] = '';
-        $out[] = '### Latest ACTA Articles';
+        $out[] = '### Derniers articles ACTA';
         $out[] = '';
-        $out[] = 'Recent published articles not already listed in the highlights.';
+        $out[] = 'Articles publiés récemment, à l’exclusion de ceux déjà mis à la une.';
         $out[] = '';
         $recent = get_posts([
             'post_type' => 'post',
@@ -187,13 +189,13 @@ final class Amino_Dynamic_LLMS {
             }
         }
         if (!$recent_count) {
-            $out[] = 'Browse the ACTA archive for all published articles.';
+            $out[] = 'Consulter les archives d’ACTA pour retrouver les articles publiés.';
         }
 
         $out[] = '';
-        $out[] = '## Recently Updated Portfolio Projects';
+        $out[] = '## Projets du portfolio récemment mis à jour';
         $out[] = '';
-        $out[] = 'The following published portfolio entries were most recently updated. Refer to individual project pages for the studio’s specific roles and collaborations.';
+        $out[] = 'Les projets publiés ci-dessous figurent parmi les plus récemment actualisés. Consulter les fiches individuelles pour connaître les interventions exactes du studio et les éventuelles collaborations.';
         $out[] = '';
         $projects = get_posts([
             'post_type' => 'amino_project',
@@ -212,7 +214,7 @@ final class Amino_Dynamic_LLMS {
             }
         }
         if (!$project_count) {
-            $out[] = 'Browse the Work page for the published portfolio.';
+            $out[] = 'Consulter Projects — Portfolio pour découvrir les réalisations publiées.';
         }
         $out[] = '';
         $out[] = self::END;
@@ -234,49 +236,50 @@ final class Amino_Dynamic_LLMS {
 
     /** One-time idempotent migration of the static llms.txt overview. */
     private static function ensure_editorial_sections(string $document): ?string {
-        $main = self::section($document, '## Main Pages');
-        $categories = self::section($document, '## Project Categories');
+        $main = (self::section($document, '## Pages principales') ?? self::section($document, '## Main Pages'));
+        $categories = (self::section($document, '## Catégories de projets') ?? self::section($document, '## Project Categories'));
         if ($main === null || $categories === null) {
-            self::error('Required editorial sections (Main Pages / Project Categories) were not found. No changes made.');
+            self::error('Les rubriques Pages principales / Catégories de projets sont absentes. Aucune modification.');
             return null;
         }
 
         $main_text = $main[0];
         if (!str_contains($main_text, home_url('/acta/'))) {
-            $line = '- [ACTA — Editorial Journal](' . home_url('/acta/') . '): Independent French-language journal covering digital power, AI, cybersecurity, infrastructure and civil liberties.';
+            $line = '- [ACTA — Journal éditorial](' . home_url('/acta/') . '): journal francophone indépendant sur l’IA, le pouvoir numérique, la cybersécurité et les libertés publiques.';
             $main_text = self::insert_after_link($main_text, home_url('/lab/'), $line);
         }
         if (!str_contains($main_text, home_url('/contact/'))) {
-            $line = '- [Contact](' . home_url('/contact/') . '): Contact details and enquiries for the studio.';
+            $line = '- [Contact](' . home_url('/contact/') . '): coordonnées et prises de contact avec le studio.';
             $main_text = self::insert_after_link($main_text, home_url('/acta/'), $line);
         }
         $document = self::replace_section($document, $main, $main_text);
 
         // Find again: Main Pages may have grown, changing later offsets.
-        $categories = self::section($document, '## Project Categories');
+        $categories = (self::section($document, '## Catégories de projets') ?? self::section($document, '## Project Categories'));
         if ($categories === null) {
-            self::error('Project Categories disappeared during migration. No changes made.');
+            self::error('La rubrique Catégories de projets a disparu pendant la vérification. Aucune modification.');
             return null;
         }
         $cat_text = $categories[0];
         if (!str_contains($cat_text, home_url('/project-category/spaces/'))) {
-            $line = '- [Spaces Projects](' . home_url('/project-category/spaces/') . ')';
+            $line = '- [Projets Spaces](' . home_url('/project-category/spaces/') . ')';
             $cat_text = self::insert_after_link($cat_text, home_url('/project-category/photo/'), $line);
         }
         $document = self::replace_section($document, $categories, $cat_text);
 
-        // The two published Spaces entries are part of the curated portfolio, not ACTA.
-        if (self::section($document, '## Selected Spaces Projects') === null) {
-            $categories = self::section($document, '## Project Categories');
+        // Les projets Spaces relèvent du portfolio, pas d’ACTA.
+        if (self::section($document, '## Projets Spaces sélectionnés') === null && self::section($document, '## Selected Spaces Projects') === null) {
+            $categories = (self::section($document, '## Catégories de projets') ?? self::section($document, '## Project Categories'));
             if ($categories === null) {
-                self::error('Could not locate the project categories insertion point. No changes made.');
+                self::error('Impossible de trouver la rubrique Catégories de projets. Aucune modification.');
                 return null;
             }
             $spaces = implode("\n", [
-                '## Selected Spaces Projects',
+                '## Projets Spaces sélectionnés',
                 '',
-                '- [Ziryab 1.0 — Al-Ándalus CS](' . home_url('/project/ziryab-1-0/') . '): Original spatial design project for Al-Ándalus CS in Castelló, Spain.',
-                '- [Ziryab 2.0 — Al-Ándalus CS](' . home_url('/project/ziryab-2-0/') . '): Later extension of the Al-Ándalus CS project, following Ziryab 1.0.',
+                '- [Ziryab 1.0 — Al-Ándalus CS](' . home_url('/project/ziryab-1-0/') . ') : projet initial d’aménagement pour Al-Ándalus CS à Castelló.',
+                '- [Ziryab 1.2 — Al-Ándalus CS](' . home_url('/project/ziryab-2-0/') . ') : évolution du projet Ziryab 1.0, URL historique conservée.',
+                '- [Cerámica Rústica](' . home_url('/project/travertine-craft/') . ') : salle de bain en travertin, céramique artisanale, marbre italien et chêne.',
                 '',
             ]);
             $document = substr($document, 0, $categories[1]) . $spaces . "\n" . substr($document, $categories[1]);
@@ -337,22 +340,22 @@ final class Amino_Dynamic_LLMS {
     public static function refresh(): bool {
         $path = trailingslashit(ABSPATH) . 'llms.txt';
         if (is_link($path) || !is_file($path) || !is_readable($path) || !is_writable($path)) {
-            self::error('Root llms.txt is missing, is a symlink, or is not readable and writable by PHP. The existing file was not changed.');
+            self::error('Le fichier llms.txt à la racine est absent, est un lien symbolique ou n’est pas accessible en lecture et écriture. Le fichier existant a été préservé.');
             return false;
         }
         $original = @file_get_contents($path);
         if (!is_string($original)) {
-            self::error('Could not read root llms.txt. No changes made.');
+            self::error('Impossible de lire le fichier llms.txt. Aucune modification.');
             return false;
         }
         if (substr_count($original, self::START) > 1 || substr_count($original, self::END) > 1) {
-            self::error('Duplicate dynamic markers in llms.txt. No changes made.');
+            self::error('Plusieurs marqueurs dynamiques ont été détectés dans llms.txt. Aucune modification.');
             return false;
         }
         $start = strpos($original, self::START);
         $end = strpos($original, self::END);
         if (($start === false) !== ($end === false) || ($start !== false && $end < $start)) {
-            self::error('Invalid or incomplete dynamic markers. No changes made.');
+            self::error('Les marqueurs dynamiques sont invalides ou incomplets. Aucune modification.');
             return false;
         }
 
@@ -366,16 +369,19 @@ final class Amino_Dynamic_LLMS {
         if ($start !== false && $end !== false) {
             $updated = substr($editorial, 0, $start) . $block . substr($editorial, $end + strlen(self::END));
         } else {
-            $place = strpos($editorial, '## Marseille, France and International Work');
+            $place = strpos($editorial, '## Marseille, France et collaborations internationales');
             if ($place === false) {
-                self::error('The geography insertion point is missing. No changes made.');
+                $place = strpos($editorial, '## Marseille, France and International Work');
+            }
+            if ($place === false) {
+                self::error('La rubrique géographique est introuvable. Aucune modification.');
                 return false;
             }
             $updated = substr($editorial, 0, $place) . $block . "\n\n" . substr($editorial, $place);
         }
 
         if ($updated !== $original && !self::save_file($path, $updated, $original)) {
-            self::error('Unable to write and verify llms.txt; the previous version was restored where possible.');
+            self::error('Impossible d’écrire ou de vérifier llms.txt. La version précédente a été restaurée lorsque cela était possible.');
             return false;
         }
         delete_option(self::ERROR);
@@ -410,14 +416,14 @@ final class Amino_Dynamic_LLMS {
             check_admin_referer('amino_llms_force');
             $result = self::refresh();
         }
-        echo '<div class="wrap"><h1>Amino Studio — Dynamic llms.txt <small>v' . esc_html(self::VERSION) . '</small></h1>';
-        echo '<p>Preserves the editorial text. Keeps ACTA and Contact in Main Pages, adds the two Spaces projects, and refreshes ACTA highlights, recent articles and updated portfolio projects.</p>';
+        echo '<div class="wrap"><h1>Amino Studio — llms.txt dynamique <small>v' . esc_html(self::VERSION) . '</small></h1>';
+        echo '<p>Préserve le contenu éditorial. Conserve les liens ACTA et Contact, la sélection des projets Spaces et actualise les articles et projets publiés.</p>';
         if ($result !== null) {
             echo $result
-                ? '<div class="notice notice-success"><p>llms.txt updated and verified.</p></div>'
-                : '<div class="notice notice-error"><p>llms.txt was NOT updated. Review the error below.</p></div>';
+                ? '<div class="notice notice-success"><p>llms.txt actualisé et vérifié.</p></div>'
+                : '<div class="notice notice-error"><p>Le fichier llms.txt n’a pas été mis à jour. Consulter l’erreur ci-dessous.</p></div>';
         }
-        echo '<p><strong>Last successful refresh:</strong> ' . esc_html((string) get_option(self::LAST_REFRESH, 'Never')) . '</p>';
+        echo '<p><strong>Dernière actualisation réussie :</strong> ' . esc_html((string) get_option(self::LAST_REFRESH, 'Jamais')) . '</p>';
         $error = get_option(self::ERROR, '');
         if ($error) {
             echo '<div class="notice notice-error"><p>' . esc_html((string) $error) . '</p></div>';
@@ -425,15 +431,15 @@ final class Amino_Dynamic_LLMS {
         echo '<form method="post">';
         wp_nonce_field('amino_llms_save');
         $mode = (string) get_option(self::MODE_OPTION, 'auto');
-        echo '<p><label for="amino_llms_mode"><strong>Highlighted ACTA mode:</strong></label></p>';
+        echo '<p><label for="amino_llms_mode"><strong>Mode de sélection ACTA :</strong></label></p>';
         echo '<p><select id="amino_llms_mode" name="amino_llms_mode">';
-        echo '<option value="auto"' . selected($mode, 'auto', false) . '>Automatic: three latest published articles</option>';
-        echo '<option value="manual"' . selected($mode, 'manual', false) . '>Editorial: selected post IDs in fixed order</option>';
+        echo '<option value="auto"' . selected($mode, 'auto', false) . '>Automatique : trois derniers articles publiés</option>';
+        echo '<option value="manual"' . selected($mode, 'manual', false) . '>Éditorial : articles choisis dans un ordre précis</option>';
         echo '</select></p>';
-        echo '<p><label for="amino_llms_ids"><strong>Editorially highlighted ACTA post IDs</strong> (up to 8, comma-separated, in editorial order; used in editorial mode):</label></p>';
+        echo '<p><label for="amino_llms_ids"><strong>Identifiants des articles ACTA à la une</strong> (jusqu’à 8 identifiants séparés par des virgules, dans l’ordre éditorial) :</label></p>';
         echo '<p><input class="regular-text" id="amino_llms_ids" name="amino_llms_ids" value="' . esc_attr((string) get_option(self::OPTION, '')) . '"></p>';
-        echo '<p><button class="button button-primary" name="amino_llms_save" value="1">Save highlights and refresh</button></p></form>';
-        echo '<p><strong>Published ACTA post IDs:</strong></p><ul>';
+        echo '<p><button class="button button-primary" name="amino_llms_save" value="1">Enregistrer la sélection et actualiser</button></p></form>';
+        echo '<p><strong>Identifiants des articles ACTA publiés :</strong></p><ul>';
         $available = get_posts(['post_type' => 'post', 'post_status' => 'publish', 'posts_per_page' => 20, 'orderby' => 'date', 'order' => 'DESC']);
         foreach ($available as $post) {
             echo '<li><code>' . esc_html((string) $post->ID) . '</code> — ' . esc_html(get_the_title($post)) . '</li>';
@@ -441,8 +447,8 @@ final class Amino_Dynamic_LLMS {
         echo '</ul>';
         echo '<form method="post">';
         wp_nonce_field('amino_llms_force');
-        echo '<p><button class="button" name="amino_llms_force" value="1">Refresh now</button></p></form>';
-        echo '<p><a href="' . esc_url(home_url('/llms.txt')) . '" target="_blank" rel="noopener noreferrer">View public llms.txt</a></p></div>';
+        echo '<p><button class="button" name="amino_llms_force" value="1">Actualiser maintenant</button></p></form>';
+        echo '<p><a href="' . esc_url(home_url('/llms.txt')) . '" target="_blank" rel="noopener noreferrer">Voir le llms.txt public</a></p></div>';
     }
 
     public static function notice(): void {
