@@ -174,6 +174,16 @@ $public_ok = [
     'body' => "# LAB Preview\n\n## Main Pages\n",
 ];
 check(Amino_LLMS::assess_public_response($public_ok)['state'] === 'verified', 'Live probe confirms its own signed Markdown HTTP response');
+$invalid_utf8 = $public_ok;
+$invalid_utf8['body'] = "# Valid heading\\n" . chr(255);
+check(Amino_LLMS::assess_public_response($invalid_utf8)['state'] === 'invalid', 'Signed response with invalid UTF-8 is not marked verified');
+$embedded_nul = $public_ok;
+$embedded_nul['body'] = "# Valid heading\\n" . chr(0);
+check(Amino_LLMS::assess_public_response($embedded_nul)['state'] === 'invalid', 'Signed response with a NUL byte is not marked verified');
+$oversized = $public_ok;
+$oversized['body'] = "# Heading\\n" . str_repeat('x', 131072);
+check(Amino_LLMS::assess_public_response($oversized)['state'] === 'invalid', 'Signed response above 128 KiB is not marked verified');
+
 $blocked = [
     'response' => ['code' => 503],
     'headers' => ['content-type' => 'text/html'],
@@ -189,7 +199,7 @@ Amino_LLMS::probe_public_endpoint();
 check(
     $GLOBALS['probe_args']['url'] === 'https://example.test/llms.txt' &&
     $GLOBALS['probe_args']['options']['redirection'] === 0 &&
-    $GLOBALS['probe_args']['options']['limit_response_size'] === 4096,
+    $GLOBALS['probe_args']['options']['limit_response_size'] === 131073,
     'Live probe targets only the local public endpoint without redirects'
 );
 $GLOBALS['ajax_admin'] = false;
