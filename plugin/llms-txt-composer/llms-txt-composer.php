@@ -428,7 +428,7 @@ final class Amino_LLMS {
         $signature = trim((string) wp_remote_retrieve_header($response, 'x-llms-txt-composer'));
         $body = (string) wp_remote_retrieve_body($response);
         if ($signature === self::VERSION && $status === 200 && $mime === 'text/plain' &&
-            preg_match('/\\A#[ \\t]+\\S/u', $body) === 1) {
+            self::valid_document($body)) {
             $state = 'verified';
             $message = __('Composer serves public plain-text Markdown at /llms.txt.', 'llms-txt-composer');
         } elseif ($signature === self::VERSION) {
@@ -446,7 +446,7 @@ final class Amino_LLMS {
         $response = wp_safe_remote_get(home_url('/llms.txt'), [
             'timeout' => 5,
             'redirection' => 0,
-            'limit_response_size' => 4096,
+            'limit_response_size' => self::MAX_BYTES + 1,
             'headers' => ['Accept' => 'text/plain'],
         ]);
         return self::assess_public_response($response);
